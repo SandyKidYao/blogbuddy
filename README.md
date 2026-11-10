@@ -73,7 +73,7 @@ A built-in rich-text editor for `.md` files, powered by [Milkdown](https://milkd
 - **Compact save** — bullets normalised to `-`, blank lines collapsed, entities decoded — Git diffs stay quiet
 - **External-change banner** — if the file is touched on disk while you have unsaved edits, choose Reload or Keep
 - **Paste-to-disk assets** — images and files dropped into the canvas are written next to the document (or under `blogbuddy.assetDir`) and inserted as relative paths
-- **Zen / Read layout toggle** — small `Z` / `R` button at the top-right flips between Zen mode (centered 860px, writing-focused) and Read mode (full-viewport, better for long reads). Choice persists across sessions
+- **Zen / Editor mode** — small `Z` / `E` button at the top-right. Zen Mode is a centered, distraction-free column: no line numbers, frontmatter or column edges, and the toggle fades while you type. Editor Mode is full width with line numbers and the frontmatter head. Choice persists across sessions
 - **Auto-save** with `Cmd+S` to flush
 
 ---

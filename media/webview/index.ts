@@ -145,7 +145,6 @@ function scheduleAutoSave(): void {
     editVersion++;
     // Keystrokes only flag the edit; the full draft is serialized once typing pauses.
     vscode.postMessage({ type: 'dirty', isDirty: true, revision, editVersion });
-    updateStatus('未保存');
     if (isComposing) {
         pendingComposedChange = true;
         return;
@@ -187,18 +186,16 @@ function sendSave(type: 'save' | 'auto-save', flushId?: string): void {
     if (snapshot === savedSnapshot && pendingSaves.size === 0 && type !== 'save') {
         vscode.postMessage({ type: 'dirty', isDirty: false, revision, editVersion });
         if (flushId) { vscode.postMessage({ type: 'flush-noop', flushId, revision }); }
-        updateStatus('已保存');
         return;
     }
     postDraft();
     pendingSaves.set(editVersion, { snapshot, normalized: normalizedMarkdown(editor, baseUri), frontmatter });
     vscode.postMessage({ type, content, frontmatter, revision, editVersion, flushId });
-    updateStatus('保存中…');
 }
 
 function setEditingLocked(locked: boolean): void {
     editingLocked = locked;
-    for (const id of ['editor-layout', 'editor-toolbar', 'frontmatter-panel']) {
+    for (const id of ['editor-layout', 'editor-toolbar']) {
         const element = document.getElementById(id);
         if (element) { element.inert = locked; }
     }
@@ -226,7 +223,7 @@ async function initEditor(): Promise<void> {
             ctx.update(uploadConfig.key, () => ({
                 uploader: async files => {
                     try { return await fileUploader(files, editor.ctx.get(editorViewCtx).state.schema); }
-                    catch (error) { updateStatus(`上传失败：${error instanceof Error ? error.message : '请重试'}`); return []; }
+                    catch (error) { showNotice(`上传失败：${error instanceof Error ? error.message : '请重试'}`); return []; }
                 },
                 enableHtmlFileUploader: true,
                 uploadWidgetFactory: (pos: number, spec: Parameters<typeof Decoration.widget>[2]) => {
@@ -317,7 +314,6 @@ window.addEventListener('message', (event: MessageEvent<HostMessage>) => {
             loading = false;
             pendingComposedChange = false;
             hideConflictBanner();
-            updateStatus('已同步');
             setEditingLocked(false);
             window.dispatchEvent(new Event('bb-document-loaded'));
             if (msg.reloadId !== undefined) { vscode.postMessage({ type: 'reload-applied', reloadId: msg.reloadId, revision }); }
@@ -326,7 +322,6 @@ window.addEventListener('message', (event: MessageEvent<HostMessage>) => {
             if (msg.revision !== revision) { break; }
             conflictId = msg.conflictId;
             if (autoSaveTimer) { clearTimeout(autoSaveTimer); autoSaveTimer = null; }
-            updateStatus('文件有冲突，自动保存已暂停');
             showConflictBanner();
             break;
         case 'rebase':
@@ -359,14 +354,13 @@ window.addEventListener('message', (event: MessageEvent<HostMessage>) => {
                 for (const version of pendingSaves.keys()) {
                     if (version <= msg.editVersion) { pendingSaves.delete(version); }
                 }
-                if (msg.editVersion === editVersion) { updateStatus('已保存'); }
             } else {
                 pendingSaves.delete(msg.editVersion);
-                updateStatus(`保存失败：${msg.message || '请重试'}`);
+                showNotice(`保存失败：${msg.message || '请重试'}`);
             }
             break;
         case 'notice':
-            updateStatus(msg.message);
+            showNotice(msg.message);
             break;
         case 'theme':
             document.body.setAttribute('data-theme', msg.kind);
@@ -387,7 +381,7 @@ window.addEventListener('message', (event: MessageEvent<HostMessage>) => {
                 upload.reject(new Error(msg.message));
                 pendingUploads.delete(msg.uploadId);
             }
-            updateStatus(`上传失败：${msg.message}`);
+            showNotice(`上传失败：${msg.message}`);
             break;
         }
         case 'request-save': {
@@ -412,30 +406,33 @@ window.addEventListener('message', (event: MessageEvent<HostMessage>) => {
             else { pendingFlushes.clear(); }
             setEditingLocked(false);
             break;
-        case 'set-wide-mode': {
+        case 'set-layout-mode': {
             // Host is the source of truth for this global preference; we
             // never flip the class locally — only mirror what the host says.
-            const wide = !!msg.wide;
-            document.body.classList.toggle('bb-wide', wide);
-            // Tooltip names the destination so users understand what a click
-            // will do, even though the visible letter labels the current mode.
-            const btn = document.getElementById('wide-toggle');
+            const editorMode = msg.mode === 'editor';
+            document.body.classList.toggle('bb-mode-editor', editorMode);
+            document.body.classList.toggle('bb-mode-zen', !editorMode);
+            // The letter labels the current mode; the tooltip names the destination.
+            const btn = document.getElementById('mode-toggle');
             if (btn) {
-                btn.title = wide
-                    ? 'Read mode — click for Zen mode'
-                    : 'Zen mode — click for Read mode';
+                btn.title = editorMode
+                    ? '当前 Editor Mode，点击切换到 Zen Mode'
+                    : '当前 Zen Mode，点击切换到 Editor Mode';
             }
             break;
         }
     }
 });
 
-// Wide-mode toggle: send a request to the host, which persists the flip and
-// broadcasts the new value back via 'set-wide-mode'. This indirection keeps
-// multiple BB Editor panels in sync (they all receive the same broadcast).
-document.getElementById('wide-toggle')?.addEventListener('click', () => {
-    vscode.postMessage({ type: 'toggle-wide-mode' });
+// Layout toggle: the host persists the flip and broadcasts the new mode back
+// via 'set-layout-mode', keeping every open BB Editor panel in sync.
+document.getElementById('mode-toggle')?.addEventListener('click', () => {
+    vscode.postMessage({ type: 'toggle-layout-mode' });
 });
+
+// Zen Mode fades the remaining chrome while typing; any pointer movement brings it back.
+document.getElementById('editor')?.addEventListener('keydown', () => document.body.classList.add('bb-typing'));
+document.addEventListener('mousemove', () => document.body.classList.remove('bb-typing'));
 
 // Closing the panel (tab click, Cmd+W) blurs the webview or sends a modifier
 // key first — hand over the pending draft before the view can disappear.
@@ -542,7 +539,7 @@ function triggerBB(): void {
         // current (now tag-free) Markdown.
         if (command.startsWith('bb-render')) {
             // Keep the tag until the Reader can actually run.
-            if (!hasFilePath) { updateStatus('请先保存文件，再使用 AI Reader'); return; }
+            if (!hasFilePath) { showNotice('请先保存文件，再使用 AI Reader'); return; }
             // The block's interior content starts at (replaceFrom + 1).
             const absTagStart = match.from;
             const absTagEnd = match.to;
@@ -598,9 +595,15 @@ function saveFile(): void {
     sendSave('save');
 }
 
-function updateStatus(text: string): void {
+// Routine save state lives in the tab's dirty marker; only things the user must act on surface here.
+let noticeTimer: ReturnType<typeof setTimeout> | undefined;
+function showNotice(text: string): void {
     const el = document.getElementById('status');
-    if (el) { el.textContent = text; }
+    if (!el) { return; }
+    el.textContent = text;
+    el.hidden = false;
+    if (noticeTimer) { clearTimeout(noticeTimer); }
+    noticeTimer = setTimeout(() => { el.hidden = true; }, 6000);
 }
 
 // ---- Conflict Banner ----

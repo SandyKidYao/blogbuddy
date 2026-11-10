@@ -5,6 +5,7 @@ import { WebviewBridge } from '../services/WebviewBridge';
 import { ReaderPanel } from './readerCommand';
 import { isRenderCmd } from '../core/reader';
 import { editorStatus } from '../services/EditorStatus';
+import type { LayoutMode } from '../services/webviewProtocol';
 
 export function registerEditorCommand(context: vscode.ExtensionContext) {
     context.subscriptions.push(
@@ -78,11 +79,10 @@ class EditorPanel implements vscode.Disposable {
     // tell us "some BB Editor is active", not which one.
     private static activePanel: EditorPanel | undefined;
 
-    // Wide-mode is a global UI preference — once the user toggles, every
-    // open BB Editor panel reflects the same layout so they don't end up
-    // with one wide and one narrow editor side-by-side. Stored in globalState
-    // under this key; loaded once at panel creation and broadcast on toggle.
-    private static readonly WIDE_MODE_KEY = 'blogbuddy.editorWideMode';
+    // Layout mode (Zen / Editor) is a global UI preference — every open BB
+    // Editor panel shows the same mode. Stored as a boolean (true = Editor)
+    // under the key used before the rename, so existing choices carry over.
+    private static readonly EDITOR_MODE_KEY = 'blogbuddy.editorWideMode';
 
     private panel: vscode.WebviewPanel;
     private bridge: WebviewBridge;
@@ -185,7 +185,7 @@ class EditorPanel implements vscode.Disposable {
             onDirtyChange: (dirty) => this.setDirty(dirty),
             onReady: () => this.onWebviewReady(),
             onReaderDispatch: (cmd, msgText, content) => this.handleReaderDispatch(cmd, msgText, content),
-            onToggleWideMode: () => this.toggleWideMode(),
+            onToggleLayoutMode: () => this.toggleLayoutMode(),
             onStatsChange: (stats) => editorStatus.update(this.statusId, stats),
             onRecoverDraft: (content) => {
                 void vscode.workspace.openTextDocument({ language: 'markdown', content })
@@ -225,13 +225,8 @@ class EditorPanel implements vscode.Disposable {
                     : 'dark',
         });
 
-        // Send current wide-mode preference so the webview applies it before
-        // the user sees anything (avoids a flash of narrow layout when the
-        // saved preference is wide).
-        this.bridge.post({
-            type: 'set-wide-mode',
-            wide: this.context.globalState.get<boolean>(EditorPanel.WIDE_MODE_KEY, false),
-        });
+        // The HTML already carries the mode; this syncs the toggle's tooltip.
+        this.bridge.post({ type: 'set-layout-mode', mode: this.layoutMode() });
 
         // 加载文件内容
         if (this.filePath) {
@@ -271,17 +266,21 @@ class EditorPanel implements vscode.Disposable {
         this.panel.title = dirty ? `● ${baseName}` : baseName;
     }
 
+    private layoutMode(): LayoutMode {
+        // Editor Mode is the default; Zen is opt-in.
+        return this.context.globalState.get<boolean>(EditorPanel.EDITOR_MODE_KEY, true) ? 'editor' : 'zen';
+    }
+
     /**
-     * Flip the wide-mode preference, persist it, and push the new state to
+     * Flip between Zen and Editor mode, persist it, and push the new mode to
      * every open BB Editor panel so they all stay in sync. Called when the
      * webview clicks the toggle button.
      */
-    private async toggleWideMode(): Promise<void> {
-        const current = this.context.globalState.get<boolean>(EditorPanel.WIDE_MODE_KEY, false);
-        const next = !current;
-        await this.context.globalState.update(EditorPanel.WIDE_MODE_KEY, next);
+    private async toggleLayoutMode(): Promise<void> {
+        const next: LayoutMode = this.layoutMode() === 'zen' ? 'editor' : 'zen';
+        await this.context.globalState.update(EditorPanel.EDITOR_MODE_KEY, next === 'editor');
         for (const p of EditorPanel.panels.values()) {
-            p.bridge.post({ type: 'set-wide-mode', wide: next });
+            p.bridge.post({ type: 'set-layout-mode', mode: next });
         }
     }
 
@@ -309,35 +308,33 @@ class EditorPanel implements vscode.Disposable {
     <link href="${styleUri}" rel="stylesheet">
     <title>BB Editor</title>
 </head>
-<body>
-    <button id="wide-toggle" class="bb-wide-toggle" title="Zen mode — click for Read mode" aria-label="Toggle layout mode">
-        <span class="bb-wide-toggle__label bb-wide-toggle__label-zen">Z</span>
-        <span class="bb-wide-toggle__label bb-wide-toggle__label-read">R</span>
+<body class="bb-mode-${this.layoutMode()}">
+    <button id="mode-toggle" class="bb-mode-toggle" type="button" aria-label="切换 Zen Mode / Editor Mode">
+        <span class="bb-mode-toggle__label bb-mode-toggle__label-zen">Z</span>
+        <span class="bb-mode-toggle__label bb-mode-toggle__label-editor">E</span>
     </button>
     <div id="conflict-banner" class="conflict-banner hidden">
         <span class="conflict-msg">文件已被外部修改，自动保存已暂停。请选择加载外部版本，或用当前内容覆盖。</span>
         <button id="conflict-reload" class="conflict-btn">加载外部版本</button>
         <button id="conflict-keep" class="conflict-btn conflict-btn-primary">保留当前版本</button>
     </div>
-    <div id="frontmatter-panel" class="frontmatter-panel frontmatter-hidden">
-        <div class="frontmatter-header">
-            <button id="frontmatter-toggle" class="frontmatter-toggle" title="Toggle frontmatter">
-                <span class="frontmatter-icon">&#9654;</span>
-                <span>Frontmatter</span>
-            </button>
-        </div>
-        <div class="frontmatter-body">
-            <div id="frontmatter-props" class="frontmatter-props"></div>
-            <details class="frontmatter-raw">
-                <summary>Raw YAML</summary>
-                <textarea id="frontmatter-editor" class="frontmatter-textarea"
-                          spellcheck="false"
-                          placeholder="---&#10;title: &#10;date: &#10;---"></textarea>
-            </details>
-        </div>
-    </div>
-    <div id="editor-layout"><div id="editor"></div></div>
-    <footer class="bb-footer"><span id="status" role="status">正在加载…</span><span id="document-stats" aria-label="文档字数"></span></footer>
+    <div id="editor-layout"><div id="editor">
+        <section id="frontmatter-panel" class="fm fm-collapsed" aria-label="文档属性" hidden>
+            <div class="fm-head">
+                <button id="frontmatter-toggle" class="fm-toggle" type="button" aria-expanded="false" title="展开 / 收起属性">
+                    <span id="frontmatter-fence" class="fm-fence">---</span>
+                    <span id="frontmatter-summary" class="fm-summary"></span>
+                </button>
+                <button id="frontmatter-source" class="fm-source-toggle" type="button" aria-pressed="false" title="编辑源码">{ }</button>
+            </div>
+            <div class="fm-body">
+                <dl id="frontmatter-props" class="fm-props"></dl>
+                <textarea id="frontmatter-editor" class="fm-raw" spellcheck="false" aria-label="属性源码"></textarea>
+                <div class="fm-fence fm-close" aria-hidden="true">---</div>
+            </div>
+        </section>
+    </div></div>
+    <div id="status" class="bb-notice" role="status" aria-live="polite" hidden></div>
     <script id="editor-script" nonce="${nonce}" src="${scriptUri}"></script>
 </body>
 </html>`;

@@ -94,8 +94,11 @@ export interface WebviewReaderDispatchMessage extends WebviewEditMetadata {
     frontmatter: string;
 }
 
-export interface WebviewToggleWideModeMessage {
-    type: 'toggle-wide-mode';
+/** Zen: centered, distraction-free writing and reading. Editor: full width with line numbers and frontmatter. */
+export type LayoutMode = 'zen' | 'editor';
+
+export interface WebviewToggleLayoutModeMessage {
+    type: 'toggle-layout-mode';
 }
 
 /** Reply to 'request-save' when nothing changed since load — no write needed. */
@@ -136,7 +139,7 @@ export type WebviewMessage =
     | WebviewFileUploadMessage
     | WebviewConflictResolveMessage
     | WebviewReaderDispatchMessage
-    | WebviewToggleWideModeMessage
+    | WebviewToggleLayoutModeMessage
     | WebviewFlushNoopMessage
     | WebviewFlushFailedMessage
     | WebviewReloadAppliedMessage
@@ -217,9 +220,9 @@ export interface HostRebaseMessage {
     revision: number;
 }
 
-export interface HostSetWideModeMessage {
-    type: 'set-wide-mode';
-    wide: boolean;
+export interface HostSetLayoutModeMessage {
+    type: 'set-layout-mode';
+    mode: LayoutMode;
 }
 
 export interface HostRequestSaveMessage {
@@ -244,7 +247,7 @@ export type HostMessage =
     | HostFileUploadedMessage
     | HostFileUploadErrorMessage
     | HostConflictMessage
-    | HostSetWideModeMessage
+    | HostSetLayoutModeMessage
     | HostRequestSaveMessage
     | HostEditUnlockMessage
     | HostRebaseMessage;

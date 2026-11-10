@@ -58,10 +58,6 @@ export function editorInfoPlugin(options: EditorInfoOptions): MilkdownPlugin {
         function publishStats(): void {
             const selected = analyzer.analyze(view.state.doc.textBetween(view.state.selection.from, view.state.selection.to, '\n'));
             lastStats = { ...lastStats, selectedWords: selected.chineseCharacters + selected.englishWords };
-            const element = document.getElementById('document-stats');
-            if (element) {
-                element.textContent = `${lastStats.words} 字 · ${lastStats.lines} 行${lastStats.selectedWords ? ` · 已选 ${lastStats.selectedWords} 字` : ''}`;
-            }
             options.stats(lastStats);
         }
 
@@ -164,6 +160,9 @@ export function editorInfoPlugin(options: EditorInfoOptions): MilkdownPlugin {
                 document.getElementById('editor')?.append(gutter);
                 observer = new ResizeObserver(measureGutter);
                 observer.observe(view.dom);
+                // The frontmatter head sits above the content; its height moves every line.
+                const head = document.getElementById('frontmatter-panel');
+                if (head) { observer.observe(head); }
                 refreshCurrent = schedule;
                 window.addEventListener('bb-document-loaded', schedule);
                 schedule();

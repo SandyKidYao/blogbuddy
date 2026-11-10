@@ -47,7 +47,7 @@ export class WebviewBridge implements vscode.Disposable {
     private frozenFlushes = new Set<string>();
 
     private onReaderDispatch?: (cmd: string, msg: string, content: string) => Promise<void>;
-    private onToggleWideMode?: () => void;
+    private onToggleLayoutMode?: () => void;
     private onStatsChange?: (stats: EditorDocumentStats) => void;
     private onRecoverDraft?: (content: string) => void;
 
@@ -59,7 +59,7 @@ export class WebviewBridge implements vscode.Disposable {
             onDirtyChange?: (isDirty: boolean) => void;
             onReady?: () => void;
             onReaderDispatch?: (cmd: string, msg: string, content: string) => Promise<void>;
-            onToggleWideMode?: () => void;
+            onToggleLayoutMode?: () => void;
             onStatsChange?: (stats: EditorDocumentStats) => void;
             onRecoverDraft?: (content: string) => void;
         }
@@ -69,7 +69,7 @@ export class WebviewBridge implements vscode.Disposable {
         this.onDirtyChange = options?.onDirtyChange;
         this.onReady = options?.onReady;
         this.onReaderDispatch = options?.onReaderDispatch;
-        this.onToggleWideMode = options?.onToggleWideMode;
+        this.onToggleLayoutMode = options?.onToggleLayoutMode;
         this.onStatsChange = options?.onStatsChange;
         this.onRecoverDraft = options?.onRecoverDraft;
 
@@ -220,8 +220,8 @@ export class WebviewBridge implements vscode.Disposable {
                     finally { this.resumeEdits(); }
                 }
                 break;
-            case 'toggle-wide-mode':
-                this.onToggleWideMode?.();
+            case 'toggle-layout-mode':
+                this.onToggleLayoutMode?.();
                 break;
             case 'flush-noop':
                 this.resolveFlush(msg.flushId, msg.revision === this.store.snapshot.revision && !this.isDirty);
