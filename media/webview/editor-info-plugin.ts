@@ -116,7 +116,6 @@ export function editorInfoPlugin(options: EditorInfoOptions): MilkdownPlugin {
             let cursor = 0;
             const decos: Decoration[] = [];
             view.state.doc.descendants((node, pos) => {
-                if (node.type.name === 'ai_block') { return false; }
                 if (node.isTextblock) {
                     const index = source.findIndex((line, i) => i >= cursor && line.type === node.type.name);
                     const line = index >= 0 ? source[index].line : 1 + offset;

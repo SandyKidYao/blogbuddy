@@ -61,35 +61,14 @@ async function main() {
 		],
 	});
 
-	// Reader webview bundle (Browser, IIFE)
-	const readerCtx = await esbuild.context({
-		entryPoints: [
-			'media/webview-reader/index.ts'
-		],
-		bundle: true,
-		format: 'iife',
-		minify: production,
-		sourcemap: !production,
-		sourcesContent: false,
-		platform: 'browser',
-		outfile: 'dist/webview-reader.js',
-		logLevel: 'silent',
-		plugins: [
-			esbuildProblemMatcherPlugin,
-		],
-	});
-
 	if (watch) {
 		await extensionCtx.watch();
 		await webviewCtx.watch();
-		await readerCtx.watch();
 	} else {
 		await extensionCtx.rebuild();
 		await webviewCtx.rebuild();
-		await readerCtx.rebuild();
 		await extensionCtx.dispose();
 		await webviewCtx.dispose();
-		await readerCtx.dispose();
 	}
 }
 

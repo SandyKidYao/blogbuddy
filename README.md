@@ -4,12 +4,11 @@
 
 # BlogBuddy
 
-**AI commands that live inside your Markdown.**
-Write a tag. Press a chord. Watch it resolve, in place.
+**A Markdown editor for VS Code where your agent works in the margin.**
+Leave a sentence beside a paragraph. Keep writing. Read the answer when you're ready.
 
-[![Version](https://img.shields.io/badge/version-0.0.13-FFD900.svg)](https://github.com/FulcrumStd/blogbuddy)
+[![Version](https://img.shields.io/badge/version-0.1.0-FFD900.svg)](https://github.com/FulcrumStd/blogbuddy)
 [![VS Code](https://img.shields.io/badge/VS%20Code-Extension-007ACC.svg)](https://marketplace.visualstudio.com/items?itemName=FulcrumStudio.blogbuddy)
-[![BB](https://img.shields.io/badge/created_with-BB-FFD900)](https://github.com/FulcrumStd/blogbuddy)
 
 [中文 README](docs/README_CN.md) · [Full guide](docs/help.md) · [Changelog](CHANGELOG.md)
 
@@ -19,92 +18,92 @@ Write a tag. Press a chord. Watch it resolve, in place.
 
 ## The premise
 
-You're writing Markdown. You want AI help — to expand, polish, translate, summarise, diagram. Most tools yank you out to a chat window, then back, then out again.
+You're writing. You want a fact checked, a second opinion, a paragraph tightened. A chat pane makes the conversation the main thing and your document an attachment: copy the text over, explain the context, wait, carry the useful part back.
 
-**BlogBuddy puts the verbs in your prose.** Drop a tag like `<bb-expd:add concrete examples>` into a paragraph, press `Cmd+B Cmd+B`, and the tag (plus the surrounding block) is replaced by streaming AI output — without leaving the cursor.
+**BlogBuddy turns that around.** The document stays the main thing, and conversations hang off the blocks they are about. Press `Cmd+B Cmd+B`, type a sentence, press Enter — the caret is back where you were. The answer arrives quietly under that block, and you read it when you reach a stopping point.
 
-That's the entire idea. Everything else is doing it well.
-
----
-
-## The tag, in one screen
-
-```markdown
-Machine learning is changing how software gets written.
-<bb-expd:make this suitable for a senior engineering audience>
-```
-
-Place the cursor in that paragraph. Hit `Cmd+B Cmd+B`. The tag disappears, the paragraph expands, words stream in token by token. Scope is inferred from where the tag sits — same line, full paragraph, or whole document.
+There is no API key to configure. BlogBuddy borrows the agent you already use: **Claude Code** or **Codex**, run in the background.
 
 ---
 
-## The vocabulary
+## Margin notes
 
-Eight inline commands plus a four-preset reader. All accept an optional refinement after the colon: `<bb-foo:say more about X>`.
+A margin note is a sentence you leave beside some blocks, plus what the agent says back. Notes are never written into your Markdown file.
 
-| Tag | What it does |
+**Asking**
+
+- `Cmd+B Cmd+B` / `Ctrl+B Ctrl+B` in BB Editor (or click the faint `※` to the left of a block). A one-line box opens: type, press `↵`.
+- The block is the unit. What you ask about depends on where the caret is:
+
+| Caret or selection | The note is about |
 |---|---|
-| `<bb:any instruction>` | Free-form. Hand BB any task; it works on the current scope. The flexible escape hatch |
-| `<bb-expd:focus>` | Expand and elaborate, keeping tone |
-| `<bb-impv:focus>` | Polish for clarity. Inline mode rewrites the block; standalone tag rewrites the whole document into `*_improved.md` |
-| `<bb-tslt:target language>` | Translate the document. Outputs `myblog_日本語.md` and a link |
-| `<bb-tldr:style>` | Inline TL;DR summary |
-| `<bb-mmd:diagram type>` | Generate a fenced Mermaid block. Picks flowchart / sequence / class / state / ER / gantt / pie automatically |
-| `<bb-kwd:focus>` | 8–12 SEO-friendly keywords |
-| `<bb-tag>` | Insert a "created with BB" attribution badge |
-| `<bb-render-blog:>` `<bb-render-skim:>` `<bb-render-expl:>` `<bb-render:prompt>` | AI Reader View — see below |
+| In a paragraph, list, code block, quote or table | That block |
+| In a heading | The whole section under it |
+| A selection across several blocks | Those blocks |
+| A selection inside one block | That block, with the selected words quoted |
 
-> **Streaming everywhere.** Output appears as the model writes it. **Context-aware.** BB reads the surrounding document, not just the highlighted text. **Smart scope.** Cursor position alone tells BB whether to rewrite a line, a paragraph, or the whole file.
+The box shows what you are about to ask about in Markdown's own signs: `¶` a paragraph, `## Title` a section, `-` a list, ` ``` ` code, `>` a quote, `¶×3` three blocks, `“…”` the selected words.
+
+**While you keep writing**
+
+- A one-line summary appears under the block, with a rail to its left. Marching dashes mean the agent is working; the line shows what it is doing in signs — `⌕ query` searching, `↗ host` reading a page, a file name, `✎` writing.
+- When the answer lands, only that line changes: the rail turns solid and the line shows the first words of the answer. Nothing pops up, and the caret is never moved.
+- A small counter at the top-right shows unread notes; click it to jump to the next one.
+
+**Reading and following up**
+
+- Click the line to expand the thread in place. The last row starts with `※`: type there to follow up; the agent keeps the note's earlier turns.
+- `∎` dismisses a note once you are done with it; `⌃` just folds it back to one line.
+
+**Changes are proposals**
+
+When you ask for changes ("tighten this", "fix typos", "reorganise this section"), the agent never touches the file. It hands back a rewrite, and BB Editor shows the difference block by block while the note is open:
+
+| Sign (left) | Meaning |
+|---|---|
+| `~` | Rewritten in place — deletions and insertions marked in the text |
+| `−` above `+` | Heavily rewritten — old block above, new block below |
+| `+` | New block |
+| `−` | Block removed |
+| `⤷` and `↑` / `↓` | Block moved: shown in full at its new place, collapsed to one line at the old one |
+
+- Accept or reject each changed block with `✓` / `×` on its right. The note counts what is left in the same signs (`~2 +1 −1 ⤷1`) and has its own `✓` / `×` for all of it.
+- Accepting is an ordinary edit — `Cmd+Z` undoes it. Until you accept, the file on disk is unchanged and auto-save is unaffected.
+- You can keep editing around a proposal. If you edit a block the proposal wanted to change, that one change is dropped rather than applied over your edit.
+
+**What the agent can do**
+
+- It runs read-only: it can read files in your workspace and search the web, and it cannot write or run commands that change anything.
+- Each question starts one background run of your agent and uses that agent's own account and quota.
+- Notes are kept in VS Code's extension storage, per document — nothing is added to your repository.
 
 ---
 
 ## BB Editor — a WYSIWYG that respects Markdown
 
-A built-in rich-text editor for `.md` files, powered by [Milkdown](https://milkdown.dev). Open it with `Cmd+Shift+B` / `Ctrl+Shift+B` — either on a `.md` file in the Explorer, or with a `.md` already open in VS Code's text editor to swap it for the BB Editor in place. The editor title bar's BB icon does the same. Saves as plain Markdown, with predictable normalisation.
+A rich-text editor for `.md` files, powered by [Milkdown](https://milkdown.dev). Open it with `Cmd+Shift+B` / `Ctrl+Shift+B` — on a `.md` file in the Explorer, or with a `.md` already open in VS Code's text editor to swap it for BB Editor in place. The same chord switches back to the Markdown source.
 
 - **WYSIWYG with full GFM** — tables, strikethrough, task lists, autolinks, blockquotes, fenced code
-- **Slash menu (`/`)** — block types and every BB command, pre-filled
-- **Inline `Cmd+B Cmd+B`** — fire any `<bb-*>` tag without leaving the canvas
-- **Streaming AI blocks** — results appear inline as a typed ProseMirror node
-- **Frontmatter Properties panel** — `title` · `date` · `tags` · `categories` · `author` · `slug` · `draft` · `description` rendered as typed controls (date picker, chip input, toggle, textarea). Raw YAML remains available as a collapsible fallback
+- **Slash menu (`/`)** — block types
+- **Frontmatter head** — the file's own `---` fences, with `title` · `date` · `tags` · `categories` · `author` · `slug` · `draft` · `description` edited in place; raw YAML one click away
+- **Source line numbers** — each block shows its line in the underlying `.md`
 - **Prism syntax highlighting** — 20+ languages; palette tracks VS Code light / dark / high-contrast themes
-- **IME-safe** — CJK composition events guard auto-save and BB triggers
+- **IME-safe** — CJK composition never leaks into auto-save
 - **Arrow ligatures** — `->` → `→`, `=>` → `⇒` outside code and IME
-- **Compact save** — bullets normalised to `-`, blank lines collapsed, entities decoded — Git diffs stay quiet
-- **External-change banner** — if the file is touched on disk while you have unsaved edits, choose Reload or Keep
+- **Quiet saves** — blocks you did not edit keep their original bytes, so Git diffs stay small
+- **External-change banner** — if the file changes on disk while you have unsaved edits, choose Reload or Keep
 - **Paste-to-disk assets** — images and files dropped into the canvas are written next to the document (or under `blogbuddy.assetDir`) and inserted as relative paths
-- **Zen / Editor mode** — small `Z` / `E` button at the top-right. Zen Mode is a centered, distraction-free column: no line numbers, frontmatter or column edges, and the toggle fades while you type. Editor Mode is full width with line numbers and the frontmatter head. Choice persists across sessions
-- **Auto-save** with `Cmd+S` to flush
-
----
-
-## AI Reader View — your Markdown, redesigned
-
-Trigger `<bb-render-*>` and the AI re-interprets your document as a complete HTML "reading artifact" — rendered in a side panel, never touching your source file.
-
-| Preset | The brief to the model |
-|---|---|
-| `<bb-render-blog:>` | Polished article — sticky TOC, callouts, comfortable measure |
-| `<bb-render-skim:>` | TL;DR up top, dense visual structure, `<details>` for skippable depth |
-| `<bb-render-expl:>` | Teaching artifact — SVG diagrams, code annotations, "why this matters" sidebars |
-| `<bb-render:your prompt>` | Custom — your prompt drives the entire creative direction |
-
-- **Live streaming preview** in a sandboxed iframe — watch the HTML compose itself
-- **Editable refinement prompt + Regenerate** — tweak without re-typing the tag
-- **Self-contained `.html` export** — local images base64-inlined by default (toggle `blogbuddy.reader.inlineAssets` for relative paths instead)
-- **`.bbreader.md` style reference** (optional) — drop one at your workspace root describing typography, colors, components; every render uses it as authoritative style guidance. Scaffold via **BlogBuddy: Create .bbreader.md Template**
-- **Source-changed banner** — re-render on demand, never automatic (renders are slow and metered)
-- **Cost guard** at ~25k input tokens — large docs prompt for confirmation before spending
+- **Zen / Editor mode** — the small `Z` / `E` button at the top-right. Zen is a centered, distraction-free column whose chrome fades while you type; Editor is full width with line numbers and the frontmatter head
+- **Auto-save**, with `Cmd+S` to flush
 
 ---
 
 ## Quick start
 
 1. Install **BlogBuddy** from the VS Code Marketplace.
-2. Set credentials — either `blogbuddy.apiKey` in settings, **or** export `BLOGBUDDY_API_KEY` (or `OPENAI_API_KEY`).
-3. *(Optional)* set `blogbuddy.baseURL` for OpenAI-compatible providers (OpenRouter, DeepSeek, your own proxy). Default: `https://api.openai.com/v1`.
-4. Run **BlogBuddy: Select Model** from the command palette — picks from `/v1/models`, or enter a custom id.
-5. Open a `.md` file, drop a tag, press `Cmd+B Cmd+B`.
+2. Make sure **Claude Code** (`claude`) or **Codex** (`codex`) is installed and signed in. BlogBuddy uses whichever it finds, Claude Code first.
+3. Open a `.md` file and press `Cmd+Shift+B` to open it in BB Editor.
+4. Put the caret in a paragraph, press `Cmd+B Cmd+B`, ask something, and keep writing.
 
 ---
 
@@ -114,64 +113,44 @@ Trigger `<bb-render-*>` and the AI re-interprets your document as a complete HTM
 
 | Where | Shortcut | Action |
 |---|---|---|
-| Markdown editor | `Cmd+B Cmd+B` / `Ctrl+B Ctrl+B` | Execute BB on the current block or selection |
-| Explorer (on a `.md` file) or open Markdown editor | `Cmd+Shift+B` / `Ctrl+Shift+B` | Open BB Editor (swaps the active Markdown editor in place) |
-| BB Editor | `/` | Slash menu (BB commands + block types) |
-| BB Editor | `Cmd+B Cmd+B` | Fire an inline `<bb-*>` tag |
+| Explorer (on a `.md` file) or Markdown text editor | `Cmd+Shift+B` / `Ctrl+Shift+B` | Open BB Editor |
+| BB Editor | `Cmd+Shift+B` / `Ctrl+Shift+B` | Back to the Markdown source |
+| BB Editor | `Cmd+B Cmd+B` / `Ctrl+B Ctrl+B` | Ask about the current block, section or selection |
+| BB Editor | `Cmd+B` / `Ctrl+B` | Bold |
+| BB Editor | `/` | Slash menu |
 | BB Editor | `Cmd+S` | Save immediately |
 | BB Editor | `Backspace` (at start of heading) | Convert heading back to paragraph |
 
 ### Settings
 
-Only `apiKey` and `model` are required; everything else has sensible defaults.
-
 | Key | Description |
 |---|---|
-| `blogbuddy.apiKey` | API key. Falls back to `$BLOGBUDDY_API_KEY` → `$OPENAI_API_KEY` |
-| `blogbuddy.baseURL` | OpenAI-compatible base URL. Falls back to `$BLOGBUDDY_BASE_URL` → `$OPENAI_BASE_URL` → `https://api.openai.com/v1` |
-| `blogbuddy.model` | Model id. Use **BlogBuddy: Select Model** to pick from the provider's list |
+| `blogbuddy.agent` | Which agent answers margin notes: `auto` (default — Claude Code, then Codex), `claude`, or `codex` |
 | `blogbuddy.assetDir` | Relative subdirectory for BB Editor uploads (e.g. `assets`). Empty = alongside the document |
-| `blogbuddy.reader.inlineAssets` | Inline local images as base64 when exporting Reader HTML. Default `true` |
 
 ### Commands
 
-Open the command palette (`Cmd+Shift+P` / `Ctrl+Shift+P`) and type `BlogBuddy:`.
-
 | Command | Purpose |
 |---|---|
-| `BlogBuddy: Hi BB` | Execute BB on the current scope (same as the chord) |
 | `BlogBuddy: Open BB Editor` | Open the current `.md` in BB Editor |
-| `BlogBuddy: Select Model` | Fetch `/v1/models` and pick (or enter) a model id |
-| `BlogBuddy: Show Config Diagnostics` | Masked report of what the extension actually resolves for each field |
-| `BlogBuddy: Show Usage Statistics` | Token usage, request counts, per-model cost (where pricing is available) |
-| `BlogBuddy: Reset Usage Statistics` | Clear all counters (with confirmation) |
-| `BlogBuddy: Refresh Pricing Data` | Re-fetch pricing data |
-| `BlogBuddy: Create .bbreader.md Template` | Scaffold the AI Reader style-reference template |
+| `BlogBuddy: Reopen as Markdown Source` | Switch the focused BB Editor back to the text editor |
 
 ### Status bar
 
-Two right-side items, both Markdown-only:
-
-- **Word count** — Chinese characters and English words counted separately and summed
-- **Config source** — `$(key) BB · cfg | env | default` shows where your `apiKey` resolves from; turns yellow on missing key or model. Hover for the per-field source table; click to open Diagnostics
+**Word count** for Markdown files and BB Editor — Chinese characters and English words counted separately and summed, with selection, characters and lines in the tooltip.
 
 ---
 
 ## Notes
 
-> **Development status.** BlogBuddy is in active development. Features may move, break, or change between versions. Please use with judgement in production workflows.
+> **Development status.** BlogBuddy is in active development. Features may move, break, or change between versions.
 >
-> **Experimental.** The free-form `<bb:>` command is the most flexible and the most token-hungry — prefer specialised tags when one fits.
+> **Coming from an earlier version?** The `<bb-*>` tags, the AI Reader View, and the API key / model settings are gone. Everything AI now happens through margin notes in BB Editor, using your own agent CLI.
 
 <details>
-<summary><strong>macOS — env var not picked up?</strong></summary>
+<summary><strong>"没有找到 claude 或 codex 命令"</strong></summary>
 
-Apps launched from Dock or Spotlight don't inherit your shell config. Two fixes:
-
-- **From Terminal:** `source ~/.zshrc && code .`
-- **Persistent:** `launchctl setenv OPENAI_API_KEY 'sk-...'`, then ⌘Q and relaunch VS Code
-
-Run **BlogBuddy: Show Config Diagnostics** to verify what the extension host actually sees.
+BlogBuddy looks for the agent on VS Code's `PATH`, your login shell's `PATH`, and the usual install locations (`~/.local/bin`, `/opt/homebrew/bin`, `/usr/local/bin`, …). If it still cannot find one, check that `claude --version` or `codex --version` works in a new terminal, then restart VS Code.
 
 </details>
 
@@ -179,7 +158,7 @@ Run **BlogBuddy: Show Config Diagnostics** to verify what the extension host act
 
 ## Made for
 
-Bloggers and content writers · technical writers who need diagrams and translations · multilingual authors · anyone who'd rather press a key than open a tab.
+Bloggers and technical writers who live in Markdown, already work with an agent, and would rather not leave the page to talk to it.
 
 ## Feedback
 

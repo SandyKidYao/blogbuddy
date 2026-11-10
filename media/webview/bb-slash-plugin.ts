@@ -3,7 +3,7 @@ import { commandsCtx } from '@milkdown/kit/core';
 import { $prose } from '@milkdown/kit/utils';
 import type { MilkdownPlugin } from '@milkdown/kit/ctx';
 import type { EditorView } from '@milkdown/kit/prose/view';
-import { Plugin, PluginKey, TextSelection } from '@milkdown/kit/prose/state';
+import { Plugin, PluginKey } from '@milkdown/kit/prose/state';
 import {
     wrapInHeadingCommand,
     createCodeBlockCommand,
@@ -19,36 +19,8 @@ import type { CommandManager } from '@milkdown/kit/core';
 interface SlashItem {
     label: string;
     desc: string;
-    group: 'format' | 'bb' | 'render';
     onSelect: (view: EditorView, slashProvider: SlashProvider) => void;
 }
-
-interface BBCmdDef {
-    command: string;
-    label: string;
-    desc: string;
-    /** Tag template: use $1 as placeholder for user input cursor */
-    tag: string;
-}
-
-// ---- BB Command Definitions ----
-
-const BB_COMMANDS: BBCmdDef[] = [
-    { command: 'bb',      label: 'BB',            desc: 'Give BB a direct instruction',   tag: '<bb:$1>' },
-    { command: 'bb-expd', label: 'BB Expand',     desc: 'Expand and elaborate content',    tag: '<bb-expd>' },
-    { command: 'bb-impv', label: 'BB Improve',    desc: 'Polish and improve writing',      tag: '<bb-impv>' },
-    { command: 'bb-tslt', label: 'BB Translate',  desc: 'Translate to specified language',  tag: '<bb-tslt:$1>' },
-    { command: 'bb-kwd',  label: 'BB Keywords',   desc: 'Extract keywords',                tag: '<bb-kwd>' },
-    { command: 'bb-tldr', label: 'BB TL;DR',      desc: 'Generate a TL;DR summary',        tag: '<bb-tldr>' },
-    { command: 'bb-mmd',  label: 'BB Mermaid',    desc: 'Generate a Mermaid diagram',      tag: '<bb-mmd>' },
-];
-
-const RENDER_COMMANDS: BBCmdDef[] = [
-    { command: 'bb-render-blog', label: 'Render: Blog View',  desc: 'AI-render as a polished article', tag: '<bb-render-blog:$1>' },
-    { command: 'bb-render-skim', label: 'Render: Skim Mode',  desc: 'AI-render for fast scanning',     tag: '<bb-render-skim:$1>' },
-    { command: 'bb-render-expl', label: 'Render: Explainer',  desc: 'AI-render with SVG teaching aids', tag: '<bb-render-expl:$1>' },
-    { command: 'bb-render',      label: 'Render: Custom',     desc: 'AI-render with your own prompt',  tag: '<bb-render:$1>' },
-];
 
 // ---- Helpers ----
 
@@ -71,57 +43,10 @@ function removeSlashText(view: EditorView): void {
     view.dispatch(tr);
 }
 
-/** Insert tag text, place cursor at $1 placeholder position if present */
-function insertBBTag(view: EditorView, tag: string): void {
-    const cursorPlaceholder = '$1';
-    const hasCursor = tag.includes(cursorPlaceholder);
-    const text = tag.replace(cursorPlaceholder, '');
-
-    const { state } = view;
-    const { from } = state.selection;
-    const tr = state.tr.insertText(text, from);
-
-    if (hasCursor) {
-        const cursorPos = from + tag.indexOf(cursorPlaceholder);
-        tr.setSelection(TextSelection.create(tr.doc, cursorPos));
-    }
-
-    view.dispatch(tr);
-    view.focus();
-}
-
 // ---- Build All Slash Items ----
 
 function buildSlashItems(commands: CommandManager): SlashItem[] {
     const items: SlashItem[] = [];
-
-    // BB tag items first — insert tag text only
-    for (const cmd of BB_COMMANDS) {
-        items.push({
-            label: cmd.label,
-            desc: cmd.desc,
-            group: 'bb',
-            onSelect: (view, sp) => {
-                sp.hide();
-                removeSlashText(view);
-                insertBBTag(view, cmd.tag);
-            },
-        });
-    }
-
-    // Render items — same insert-tag pattern as BB items, just a different group.
-    for (const cmd of RENDER_COMMANDS) {
-        items.push({
-            label: cmd.label,
-            desc: cmd.desc,
-            group: 'render',
-            onSelect: (view, sp) => {
-                sp.hide();
-                removeSlashText(view);
-                insertBBTag(view, cmd.tag);
-            },
-        });
-    }
 
     // Formatting items
     const fmtAction = (fn: () => void) => (view: EditorView, sp: SlashProvider) => {
@@ -130,21 +55,21 @@ function buildSlashItems(commands: CommandManager): SlashItem[] {
         fn();
     };
 
-    items.push({ label: 'Heading 1', desc: 'Large section heading', group: 'format',
+    items.push({ label: 'Heading 1', desc: 'Large section heading',
         onSelect: fmtAction(() => commands.call(wrapInHeadingCommand.key, 1)) });
-    items.push({ label: 'Heading 2', desc: 'Medium section heading', group: 'format',
+    items.push({ label: 'Heading 2', desc: 'Medium section heading',
         onSelect: fmtAction(() => commands.call(wrapInHeadingCommand.key, 2)) });
-    items.push({ label: 'Heading 3', desc: 'Small section heading', group: 'format',
+    items.push({ label: 'Heading 3', desc: 'Small section heading',
         onSelect: fmtAction(() => commands.call(wrapInHeadingCommand.key, 3)) });
-    items.push({ label: 'Bullet List', desc: 'Unordered list', group: 'format',
+    items.push({ label: 'Bullet List', desc: 'Unordered list',
         onSelect: fmtAction(() => commands.call(wrapInBulletListCommand.key)) });
-    items.push({ label: 'Ordered List', desc: 'Numbered list', group: 'format',
+    items.push({ label: 'Ordered List', desc: 'Numbered list',
         onSelect: fmtAction(() => commands.call(wrapInOrderedListCommand.key)) });
-    items.push({ label: 'Code Block', desc: 'Fenced code block', group: 'format',
+    items.push({ label: 'Code Block', desc: 'Fenced code block',
         onSelect: fmtAction(() => commands.call(createCodeBlockCommand.key)) });
-    items.push({ label: 'Blockquote', desc: 'Quote block', group: 'format',
+    items.push({ label: 'Blockquote', desc: 'Quote block',
         onSelect: fmtAction(() => commands.call(wrapInBlockquoteCommand.key)) });
-    items.push({ label: 'Divider', desc: 'Horizontal rule', group: 'format',
+    items.push({ label: 'Divider', desc: 'Horizontal rule',
         onSelect: fmtAction(() => commands.call(insertHrCommand.key)) });
 
     return items;
@@ -183,16 +108,7 @@ class SlashMenuController {
             this.keyboardNavMode = false;
         });
 
-        let prevGroup: string | null = null;
-
         for (const item of this.items) {
-            if (prevGroup && prevGroup !== item.group) {
-                const sep = document.createElement('div');
-                sep.className = 'bb-slash-separator';
-                menu.appendChild(sep);
-            }
-            prevGroup = item.group;
-
             const el = document.createElement('div');
             el.className = 'bb-slash-item';
 
@@ -243,10 +159,9 @@ class SlashMenuController {
         switch (e.key) {
             case 'ArrowDown':
                 e.preventDefault();
-                // Clamp at the last item instead of wrapping to the top. With
-                // ~19 items now, the old modulo wrap felt like a teleport and
-                // was indistinguishable from "I just hit the bottom of what I
-                // can see" — confusing in a long scrollable list.
+                // Clamp at the last item instead of wrapping to the top: a
+                // wrap is indistinguishable from "I just hit the bottom of
+                // what I can see" in a scrollable list.
                 this.keyboardNavMode = true;
                 this.setActive(Math.min(this.activeIndex + 1, this.itemEls.length - 1));
                 return true;

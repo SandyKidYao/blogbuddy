@@ -4,15 +4,31 @@ All notable changes to the "blogbuddy" extension will be documented in this file
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
-## [Unreleased]
+## [0.1.0] - 2026-11-10
 
-### backlog
+A change of direction: BlogBuddy is now BB Editor plus **margin notes**. The inline `<bb-*>` tags and the API-key setup are gone; AI help comes from the agent CLI you already use, working beside the text instead of inside it.
 
-- Add the bb-srch command to support internet searches based on user requests
-- Agent mode: Make bb commands agentic, allowing them to reference other files in the workspace to complete tasks
-- Auto execute mode: Execute all BB commands in a file with one click
-- Add support for generating SVG images with the bb-mmd command
-- **Issue:** Warning popup may not show consistently when text selection overlaps with working area
+### Added
+
+- **Margin notes.** In BB Editor, `Cmd+B Cmd+B` (or the `※` left of a block) leaves a sentence beside the current block. The caret returns at once; the answer arrives silently as a one-line summary under the block and expands in place. Follow-ups stay in the same note; `∎` dismisses it. The note UI speaks in signs rather than words: scope in Markdown's own markers (`¶`, `## Title`, `-`, `¶×3`), progress as `⌕ query` / `↗ host` / `✎`, buttons as glyphs.
+- **Block-based scope.** A note is about whole blocks: the block under the caret, a heading's entire section, or the blocks a selection spans. Text selected inside a block is passed along as a quote.
+- **Proposed changes, block by block.** When asked to change text, the agent returns a rewrite that is shown over the document while the note is open — rewritten in place (`~`), rewritten heavily (old above new), added (`+`), removed (`−`), moved (`⤷`, `↑` / `↓`), and item-level changes inside lists. Accept or reject each block on its right, or all at once. Accepting is an ordinary edit (`Cmd+Z` undoes it); the file never changes before that.
+- **Your own agent, read-only.** Notes are answered by Claude Code or Codex, run headless with file-reading and web-search tools only. New setting `blogbuddy.agent` (`auto` / `claude` / `codex`).
+- **Notes persist** per document in the extension's storage and re-attach to their blocks by text after the file changes on disk.
+- **Unread counter** beside the Zen / Editor toggle.
+
+### Changed
+
+- `Cmd+B Cmd+B` in BB Editor now opens the ask box. A single `Cmd+B` still bolds immediately.
+- The slash menu lists block types only.
+
+### Removed
+
+- All `<bb-*>` inline tags (`bb`, `bb-expd`, `bb-impv`, `bb-tslt`, `bb-tldr`, `bb-mmd`, `bb-kwd`, `bb-tag`) and the `BlogBuddy: Hi BB` command, in both the text editor and BB Editor.
+- **AI Reader View** — the `<bb-render-*>` tags, the Reader panel, HTML export and `.bbreader.md` (including `BlogBuddy: Create .bbreader.md Template`).
+- Settings `blogbuddy.apiKey`, `blogbuddy.baseURL`, `blogbuddy.model`, `blogbuddy.reader.inlineAssets`, and the `BLOGBUDDY_*` / `OPENAI_*` environment-variable fallbacks.
+- Commands **Select Model**, **Show Config Diagnostics**, **Show / Reset Usage Statistics**, **Refresh Pricing Data**, and the config-source status bar item.
+- The `openai` dependency.
 
 ---
 

@@ -6,7 +6,7 @@ import { history } from '@milkdown/kit/plugin/history';
 import { block } from '@milkdown/kit/plugin/block';
 import { upload, uploadConfig } from '@milkdown/kit/plugin/upload';
 import { replaceAll } from '@milkdown/kit/utils';
-import { updateAIBlock, finalizeAIBlock, setAIBlockError, aiBlockPlugin, discardAIBlocks } from './ai-block-plugin';
+import { notesPlugin, handleNoteMessage, openAskAtSelection, beforeDocumentLoad, afterDocumentLoad } from './notes-plugin';
 import { bbSlashPlugin } from './bb-slash-plugin';
 import { headingKeymapPlugin } from './heading-keymap-plugin';
 import { arrowLigaturesPlugin } from './arrow-ligatures-plugin';
@@ -18,8 +18,7 @@ import type { HostMessage } from '../../src/services/webviewProtocol';
 import { editorInfoPlugin, refreshEditorInfo } from './editor-info-plugin';
 import { $prose } from '@milkdown/kit/utils';
 import { Plugin } from '@milkdown/kit/prose/state';
-import type { EditorState } from '@milkdown/kit/prose/state';
-import { findBBCommandRange, type BBCommandRange } from '../../src/utils/bbCommandRange';
+import { undo } from '@milkdown/kit/prose/history';
 import './styles.css';
 
 import type { Node, Schema } from '@milkdown/kit/prose/model';
@@ -57,7 +56,7 @@ let editingLocked = false;
 
 // ---- IME composition guard ----
 // During CJK IME composition, ProseMirror emits intermediate text that must not
-// flow into auto-save or BB command execution. We snapshot dirty intent during
+// flow into auto-save. We snapshot dirty intent during
 // composition and flush exactly once on compositionend.
 let isComposing = false;
 let pendingComposedChange = false;
@@ -244,7 +243,7 @@ async function initEditor(): Promise<void> {
         .use(arrowLigaturesPlugin)
         .use(codeHighlightPlugin)
         .use(htmlRenderPlugin)
-        .use(aiBlockPlugin)
+        .use(notesPlugin({ post: message => vscode.postMessage(message), baseUri: () => baseUri }))
         .use(editorInfoPlugin({
             markdown: () => editor ? serializeForSave(editor, baseUri) : '',
             frontmatter: getFrontmatter,
@@ -258,7 +257,7 @@ async function initEditor(): Promise<void> {
         .create();
 
     // IME composition guard on the editor root.
-    // ProseMirror emits onChange during composition; suppress auto-save/BB until it ends.
+    // ProseMirror emits onChange during composition; suppress auto-save until it ends.
     document.addEventListener('compositionstart', () => {
         isComposing = true;
         if (autoSaveTimer) { clearTimeout(autoSaveTimer); autoSaveTimer = null; }
@@ -307,7 +306,10 @@ window.addEventListener('message', (event: MessageEvent<HostMessage>) => {
             setSourceMarkdown(msg.content || '', '');
             updateFrontmatterPanel(msg.frontmatter || '');
             if (editor) {
+                // Notes are found again by what their blocks say; positions do not survive a reload.
+                beforeDocumentLoad();
                 editor.action(replaceAll(preprocessMarkdown(msg.content || '', baseUri), true));
+                afterDocumentLoad();
                 setSourceMarkdown(msg.content || '', normalizedMarkdown(editor, baseUri));
                 savedSnapshot = getFrontmatter() + serializeForSave(editor, baseUri);
             }
@@ -329,18 +331,14 @@ window.addEventListener('message', (event: MessageEvent<HostMessage>) => {
             conflictId = null;
             pendingSaves.clear();
             setEditingLocked(false);
-            if (editor) { discardAIBlocks(editor); }
             hideConflictBanner();
             sendSave('save');
             break;
-        case 'chunk':
-            if (editor) { updateAIBlock(editor, msg.id, msg.text, msg.replace); }
-            break;
-        case 'done':
-            if (editor) { finalizeAIBlock(editor, msg.id, msg.fullText); }
-            break;
-        case 'error':
-            if (editor) { setAIBlockError(editor, msg.id, msg.message); }
+        case 'note-progress':
+        case 'note-done':
+        case 'note-error':
+        case 'notes-load':
+            if (editor) { handleNoteMessage(msg); }
             break;
         case 'saved':
             if (msg.revision !== revision) { break; }
@@ -431,7 +429,11 @@ document.getElementById('mode-toggle')?.addEventListener('click', () => {
 });
 
 // Zen Mode fades the remaining chrome while typing; any pointer movement brings it back.
-document.getElementById('editor')?.addEventListener('keydown', () => document.body.classList.add('bb-typing'));
+// Typing into a note (a question, a follow-up) is not writing, so it leaves the notes legible.
+const inNoteUi = (target: EventTarget | null): boolean => target instanceof Element && !!target.closest('.bb-note, .bb-ask');
+document.getElementById('editor')?.addEventListener('keydown', (e) => {
+    if (!inNoteUi(e.target)) { document.body.classList.add('bb-typing'); }
+});
 document.addEventListener('mousemove', () => document.body.classList.remove('bb-typing'));
 
 // Closing the panel (tab click, Cmd+W) blurs the webview or sends a modifier
@@ -455,139 +457,32 @@ document.addEventListener('keydown', (e) => {
         return;
     }
 
-    // cmd+b / ctrl+b: bold immediately, unless a BB tag is in reach — then
-    // wait for a possible second press so the chord never touches formatting.
+    // cmd+b cmd+b asks about the block under the caret. A single cmd+b still
+    // bolds at once; when the second press follows, that bold is taken back.
     if ((e.metaKey || e.ctrlKey) && e.key === 'b') {
         e.preventDefault();
         e.stopPropagation();
-        if (e.repeat) { return; }
+        if (e.repeat || isComposing || loading || inNoteUi(e.target)) { return; }
         if (chordTimer) {
-            // Second cmd+b — trigger BB
             clearTimeout(chordTimer);
             chordTimer = null;
-            triggerBB();
-        } else if (editor?.action(ctx => findBBTarget(ctx.get(editorViewCtx).state))) {
-            chordTimer = setTimeout(() => {
-                chordTimer = null;
-                if (!editingLocked && !loading) { toggleBold(); }
-            }, 400);
+            revertBold();
+            openAskAtSelection();
         } else {
+            docBeforeBold = editor?.ctx.get(editorViewCtx).state.doc;
             toggleBold();
+            chordTimer = setTimeout(() => { chordTimer = null; }, 400);
         }
     }
 }, true); // capture phase — intercept before Milkdown
 
-// ---- BB Command Execution (cmd+b cmd+b) ----
-
-/** The BB tag a cmd+b chord would run: within the selection, else the current textblock. */
-function findBBTarget(state: EditorState): { match: BBCommandRange; replaceFrom: number; replaceTo: number } | null {
-    const { selection } = state;
-    const $from = selection.$from;
-
-    let searchText = '';
-    let replaceFrom = 0;
-    let replaceTo = 0;
-
-    // 1. If user has a non-empty selection, search within it
-    if (selection.from !== selection.to) {
-        searchText = state.doc.textBetween(selection.from, selection.to, '\n');
-        replaceFrom = selection.from;
-        replaceTo = selection.to;
-    } else {
-        // 2. Fall back to current textblock
-        const depth = $from.depth;
-        let blockDepth = 0;
-        for (let d = depth; d >= 1; d--) {
-            const node = $from.node(d);
-            if (node.isTextblock) {
-                searchText = node.textContent;
-                blockDepth = d;
-                break;
-            }
-        }
-        if (!searchText || !blockDepth) { return null; }
-        replaceFrom = $from.start(blockDepth);
-        replaceTo = $from.end(blockDepth);
-    }
-
-    const match = findBBCommandRange(state.doc, replaceFrom, replaceTo);
-    return match ? { match, replaceFrom, replaceTo } : null;
-}
-
-function triggerBB(): void {
+/** Take back the bold the first cmd+b of a chord applied: an edit is undone, a pending mark is toggled off. */
+let docBeforeBold: unknown;
+function revertBold(): void {
     if (!editor) { return; }
-    if (editingLocked) { return; }
-    if (isComposing) { return; }
-
-    editor.action((ctx) => {
-        const view = ctx.get(editorViewCtx);
-        const { state } = view;
-        const { selection, schema } = state;
-
-        const target = findBBTarget(state);
-        if (!target) { return; }
-        const { match, replaceFrom, replaceTo } = target;
-        const { command, message } = match;
-
-        // Text without the BB tag = selectText for the request
-        const selectText = state.doc.textBetween(replaceFrom, match.from, '\n')
-            + state.doc.textBetween(match.to, replaceTo, '\n');
-
-        // Render commands bypass the inline ai_block flow entirely. Output goes
-        // to a side panel, not back into the document — so we just delete the
-        // tag text and dispatch a reader-dispatch message to the host with the
-        // current (now tag-free) Markdown.
-        if (command.startsWith('bb-render')) {
-            // Keep the tag until the Reader can actually run.
-            if (!hasFilePath) { showNotice('请先保存文件，再使用 AI Reader'); return; }
-            // The block's interior content starts at (replaceFrom + 1).
-            const absTagStart = match.from;
-            const absTagEnd = match.to;
-            const delTr = state.tr.delete(absTagStart, absTagEnd);
-            view.dispatch(delTr);
-
-            if (editor) {
-                const content = serializeForSave(editor, baseUri);
-                vscode.postMessage({
-                    type: 'reader-dispatch',
-                    cmd: command,
-                    msg: message,
-                    content,
-                    frontmatter: getFrontmatter(), revision, editVersion,
-                });
-            }
-            return;
-        }
-
-        // Keep the actual source intact and insert a separate, unsaved suggestion.
-        const nodeType = schema.nodes['ai_block'];
-        if (!nodeType) { return; }
-
-        const requestId = crypto.randomUUID();
-        const tr = state.tr;
-        tr.delete(match.from, match.to);
-        const sourceFrom = tr.mapping.map(replaceFrom, 1);
-        const sourceTo = tr.mapping.map(replaceTo, -1);
-        const source = tr.doc.slice(sourceFrom, sourceTo);
-        const insertPos = tr.mapping.map(selection.$to.after(1), -1);
-        const aiNode = nodeType.create({
-            requestId,
-            status: 'processing',
-            content: '',
-            bbCmd: command,
-            sourceFrom, sourceTo, sourceJSON: source.toJSON(),
-        });
-        tr.insert(insertPos, aiNode);
-        view.dispatch(tr);
-
-        vscode.postMessage({
-            type: 'bb-request',
-            id: requestId,
-            cmd: command,
-            selectText: selectText.trim(),
-            msg: message,
-        });
-    });
+    const view = editor.ctx.get(editorViewCtx);
+    if (view.state.doc !== docBeforeBold) { undo(view.state, view.dispatch); }
+    else { toggleBold(); }
 }
 
 function saveFile(): void {

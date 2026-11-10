@@ -1,8 +1,8 @@
 {
   "name": "blogbuddy",
   "displayName": "Blog Buddy",
-  "description": "Your AI-powered blog writing sidekick that makes Markdown magic happen!",
-  "version": "0.0.19",
+  "description": "A WYSIWYG Markdown editor for VS Code with margin notes: leave a sentence beside a block, keep writing, and read your agent's answer when you are ready.",
+  "version": "0.1.0",
   "icon": "images/icon.png",
   "publisher": "FulcrumStudio",
   "repository": {
@@ -22,18 +22,6 @@
   "contributes": {
     "commands": [
       {
-        "command": "blogbuddy.bb",
-        "title": "BlogBuddy: Hi BB"
-      },
-      {
-        "command": "blogbuddy.selectModel",
-        "title": "BlogBuddy: Select Model"
-      },
-      {
-        "command": "blogbuddy.showDiagnostics",
-        "title": "BlogBuddy: Show Config Diagnostics"
-      },
-      {
         "command": "blogbuddy.openEditor",
         "title": "BlogBuddy: Open BB Editor",
         "icon": {
@@ -45,22 +33,6 @@
         "command": "blogbuddy.openSource",
         "title": "BlogBuddy: Reopen as Markdown Source",
         "icon": "$(code)"
-      },
-      {
-        "command": "blogbuddy.createReaderTemplate",
-        "title": "BlogBuddy: Create .bbreader.md Template"
-      },
-      {
-        "command": "blogbuddy.showUsageStats",
-        "title": "BlogBuddy: Show Usage Statistics"
-      },
-      {
-        "command": "blogbuddy.resetUsageStats",
-        "title": "BlogBuddy: Reset Usage Statistics"
-      },
-      {
-        "command": "blogbuddy.refreshPricing",
-        "title": "BlogBuddy: Refresh Pricing Data"
       }
     ],
     "menus": {
@@ -79,12 +51,6 @@
     },
     "keybindings": [
       {
-        "command": "blogbuddy.bb",
-        "key": "ctrl+b ctrl+b",
-        "mac": "cmd+b cmd+b",
-        "when": "editorTextFocus"
-      },
-      {
         "command": "blogbuddy.openEditor",
         "key": "ctrl+shift+b",
         "mac": "cmd+shift+b",
@@ -101,35 +67,27 @@
       "type": "object",
       "title": "Blog Buddy",
       "properties": {
-        "blogbuddy.apiKey": {
+        "blogbuddy.agent": {
           "type": "string",
-          "default": "",
-          "description": "API 密钥，留空时读取环境变量。",
+          "enum": [
+            "auto",
+            "claude",
+            "codex"
+          ],
+          "default": "auto",
+          "enumDescriptions": [
+            "使用已安装的第一个（先 Claude Code，后 Codex）",
+            "Claude Code（claude 命令）",
+            "Codex（codex 命令）"
+          ],
+          "description": "旁注由哪个已安装的 Agent 命令行工具回答。",
           "order": 1
-        },
-        "blogbuddy.baseURL": {
-          "type": "string",
-          "default": "",
-          "description": "OpenAI 兼容接口地址，留空使用环境变量或默认地址。",
-          "order": 2
-        },
-        "blogbuddy.model": {
-          "type": "string",
-          "default": "",
-          "description": "用于 AI 请求的模型 ID。",
-          "order": 3
         },
         "blogbuddy.assetDir": {
           "type": "string",
           "default": "",
           "description": "上传资源的相对子目录，留空与文档同目录。",
-          "order": 4
-        },
-        "blogbuddy.reader.inlineAssets": {
-          "type": "boolean",
-          "default": true,
-          "description": "导出 HTML 时嵌入本地图片，关闭则保留相对路径。",
-          "order": 5
+          "order": 2
         }
       }
     }
@@ -147,7 +105,7 @@
     "check-types": "tsc --noEmit && tsc --noEmit -p tsconfig.webview.json",
     "lint": "eslint src",
     "test": "vscode-test",
-    "test:unit": "npm run compile-tests && mocha --ui tdd out/test/utils/frontmatter.test.js out/test/utils/preserveUnchanged.test.js out/test/utils/MarkdownStatsAnalyzer.test.js out/test/utils/bbCommandRange.test.js out/test/services/EditorDocumentStore.test.js",
+    "test:unit": "npm run compile-tests && mocha --ui tdd out/test/utils/frontmatter.test.js out/test/utils/preserveUnchanged.test.js out/test/utils/MarkdownStatsAnalyzer.test.js out/test/services/EditorDocumentStore.test.js out/test/services/agentProtocol.test.js out/test/core/blockDiff.test.js out/test/core/notes.test.js",
     "deploy": "vsce publish"
   },
   "devDependencies": {
@@ -169,7 +127,6 @@
     "@types/js-yaml": "^4.0.9",
     "@types/prismjs": "^1.26.6",
     "js-yaml": "^4.1.1",
-    "openai": "^5.12.2",
     "prismjs": "^1.30.0"
   }
 }

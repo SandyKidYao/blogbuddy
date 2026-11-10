@@ -2,28 +2,41 @@ import * as vscode from 'vscode';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { watch, FSWatcher } from 'fs';
-import { BB } from '../core/bb';
-import { BBCmd, ProcessRequest } from '../core/types';
 import { ConfigService } from './ConfigService';
-import { AppError } from '../utils/ErrorHandler';
 import { extractFrontmatter } from '../utils/frontmatter';
 import { preserveUnchangedBlocks } from '../utils/preserveUnchanged';
 import { EditorDocumentStore } from './EditorDocumentStore';
 import {
     WebviewMessage,
     HostMessage,
-    WebviewBBRequestMessage,
+    WebviewNoteAskMessage,
     WebviewSaveMessage,
     WebviewFileUploadMessage,
     WebviewConflictResolveMessage,
     WebviewAutoSaveMessage,
-    WebviewReaderDispatchMessage,
     EditorDocumentStats,
     HostLoadMessage,
 } from './webviewProtocol';
 
+/** What the agent came back with for one margin note. */
+export interface NoteAnswerMessage {
+    reply: string;
+    replacement?: string;
+    agent: string;
+    seconds: number;
+}
+
+/** Answers a margin note. Injected by the command layer so this bridge stays a message router. */
+export type NoteAsker = (
+    ask: WebviewNoteAskMessage,
+    onStep: (step: string) => void,
+    signal: AbortSignal,
+) => Promise<NoteAnswerMessage>;
+
+const MAX_STORED_NOTES = 500;
+
 export class WebviewBridge implements vscode.Disposable {
-    private activeRequests = new Map<string, { cancelled: boolean }>();
+    private noteRuns = new Map<string, AbortController>();
     private disposables: vscode.Disposable[] = [];
     private filePath?: string;
     private onDirtyChange?: (isDirty: boolean) => void;
@@ -46,7 +59,9 @@ export class WebviewBridge implements vscode.Disposable {
     private flushWaiters = new Map<string, (success: boolean) => void>();
     private frozenFlushes = new Set<string>();
 
-    private onReaderDispatch?: (cmd: string, msg: string, content: string) => Promise<void>;
+    private askNote?: NoteAsker;
+    private loadNotes?: (filePath: string) => unknown[];
+    private saveNotes?: (filePath: string, notes: unknown[]) => void;
     private onToggleLayoutMode?: () => void;
     private onStatsChange?: (stats: EditorDocumentStats) => void;
     private onRecoverDraft?: (content: string) => void;
@@ -58,7 +73,9 @@ export class WebviewBridge implements vscode.Disposable {
             filePath?: string;
             onDirtyChange?: (isDirty: boolean) => void;
             onReady?: () => void;
-            onReaderDispatch?: (cmd: string, msg: string, content: string) => Promise<void>;
+            askNote?: NoteAsker;
+            loadNotes?: (filePath: string) => unknown[];
+            saveNotes?: (filePath: string, notes: unknown[]) => void;
             onToggleLayoutMode?: () => void;
             onStatsChange?: (stats: EditorDocumentStats) => void;
             onRecoverDraft?: (content: string) => void;
@@ -68,7 +85,9 @@ export class WebviewBridge implements vscode.Disposable {
         this.store = new EditorDocumentStore(this.filePath || '');
         this.onDirtyChange = options?.onDirtyChange;
         this.onReady = options?.onReady;
-        this.onReaderDispatch = options?.onReaderDispatch;
+        this.askNote = options?.askNote;
+        this.loadNotes = options?.loadNotes;
+        this.saveNotes = options?.saveNotes;
         this.onToggleLayoutMode = options?.onToggleLayoutMode;
         this.onStatsChange = options?.onStatsChange;
         this.onRecoverDraft = options?.onRecoverDraft;
@@ -136,10 +155,11 @@ export class WebviewBridge implements vscode.Disposable {
     sendLoad(content: string, filePath?: string): void {
         this.pendingReload = undefined;
         this.post(this.adoptContent(content, filePath));
+        // A freshly opened document brings back the notes left beside it.
+        this.post({ type: 'notes-load', notes: (this.filePath && this.loadNotes?.(this.filePath)) || [] });
     }
 
     private adoptContent(content: string, filePath?: string): HostLoadMessage {
-        this.cancelAllRequests();
         const { revision } = this.store.accept(content);
         const { frontmatter, body } = extractFrontmatter(content);
         this.storedFrontmatter = frontmatter;
@@ -174,11 +194,16 @@ export class WebviewBridge implements vscode.Disposable {
             case 'ready':
                 this.onReady?.();
                 break;
-            case 'bb-request':
-                await this.handleBBRequest(msg);
+            case 'note-ask':
+                await this.handleNoteAsk(msg);
                 break;
-            case 'bb-cancel':
-                this.cancelRequest(msg.id);
+            case 'note-cancel':
+                this.noteRuns.get(msg.requestId)?.abort();
+                break;
+            case 'notes-save':
+                if (this.filePath && Array.isArray(msg.notes) && msg.notes.length <= MAX_STORED_NOTES) {
+                    this.saveNotes?.(this.filePath, msg.notes);
+                }
                 break;
             case 'save':
                 await this.handleSave(msg);
@@ -211,14 +236,6 @@ export class WebviewBridge implements vscode.Disposable {
                 break;
             case 'conflict-resolve':
                 await this.handleConflictResolve(msg);
-                break;
-            case 'reader-dispatch':
-                // Untitled documents: let the command layer explain that a saved file is required.
-                if (!this.filePath) { await this.onReaderDispatch?.(msg.cmd, msg.msg, msg.content); break; }
-                if (await this.persist(msg) && await this.flushEdits(true)) {
-                    try { await this.onReaderDispatch?.(msg.cmd, msg.msg, msg.content); }
-                    finally { this.resumeEdits(); }
-                }
                 break;
             case 'toggle-layout-mode':
                 this.onToggleLayoutMode?.();
@@ -281,7 +298,6 @@ export class WebviewBridge implements vscode.Disposable {
         } else if (latest !== pending.content || this.pendingConflict?.id !== pending.id) {
             this.showConflict(latest);
         } else {
-            this.cancelAllRequests();
             const { revision } = this.store.accept(latest);
             this.lastBodyContent = extractFrontmatter(latest).body;
             this.pendingConflict = undefined;
@@ -289,61 +305,34 @@ export class WebviewBridge implements vscode.Disposable {
         }
     }
 
-    private async handleBBRequest(msg: WebviewBBRequestMessage): Promise<void> {
-        const cmd = Object.values(BBCmd).find(c => c === msg.cmd);
-        if (!cmd) {
-            this.post({ type: 'error', id: msg.id, message: `Unknown command: ${msg.cmd}` });
+    /**
+     * Hand a margin note to the agent. The document itself is never touched
+     * here: the answer (and any proposed rewrite) goes back to the webview,
+     * where the writer decides what to accept.
+     */
+    private async handleNoteAsk(msg: WebviewNoteAskMessage): Promise<void> {
+        const id = msg.requestId;
+        if (typeof id !== 'string' || typeof msg.question !== 'string' || typeof msg.scopeMarkdown !== 'string'
+            || !Array.isArray(msg.history) || !this.askNote) {
+            this.post({ type: 'note-error', requestId: id, message: '这条旁注没有发出去，请重试。' });
             return;
         }
-
-        const state = { cancelled: false };
-        this.activeRequests.set(msg.id, state);
-
+        const run = new AbortController();
+        this.noteRuns.set(id, run);
         try {
-            const request: ProcessRequest = {
-                selectText: msg.selectText,
-                filePath: this.filePath || '',
-                msg: msg.msg,
-                cmd: cmd,
-                cmdText: msg.msg ? `<${msg.cmd}:${msg.msg}>` : `<${msg.cmd}>`,
-            };
-
-            let fullText = '';
-            const generator = await BB.i().act(request);
-            for await (const chunk of generator) {
-                if (state.cancelled) { break; }
-                if (chunk.replace) {
-                    fullText = chunk.text;
-                } else {
-                    fullText += chunk.text;
-                }
-                this.post({
-                    type: 'chunk',
-                    id: msg.id,
-                    text: chunk.text,
-                    replace: chunk.replace,
-                });
-            }
-
-            if (!state.cancelled) {
-                this.post({ type: 'done', id: msg.id, fullText });
-            }
+            // The agent reads the document from disk for context, so give it the
+            // latest text. Best effort: the blocks in question travel with the note.
+            if (this.filePath && this.isDirty) { await this.flushEdits(); }
+            const answer = await this.askNote(msg, step => {
+                if (!run.signal.aborted) { this.post({ type: 'note-progress', requestId: id, step }); }
+            }, run.signal);
+            if (!run.signal.aborted) { this.post({ type: 'note-done', requestId: id, ...answer }); }
         } catch (error) {
-            if (!state.cancelled) {
-                const message = error instanceof AppError
-                    ? error.userMessage
-                    : (error instanceof Error ? error.message : 'Unknown error');
-                this.post({ type: 'error', id: msg.id, message });
+            if (!run.signal.aborted) {
+                this.post({ type: 'note-error', requestId: id, message: error instanceof Error ? error.message : '没有得到回答，请重试。' });
             }
         } finally {
-            this.activeRequests.delete(msg.id);
-        }
-    }
-
-    private cancelRequest(id: string): void {
-        const state = this.activeRequests.get(id);
-        if (state) {
-            state.cancelled = true;
+            this.noteRuns.delete(id);
         }
     }
 
@@ -359,7 +348,7 @@ export class WebviewBridge implements vscode.Disposable {
         this.post({ type: 'conflict', conflictId: this.pendingConflict.id, revision: this.store.snapshot.revision });
     }
 
-    private async persist(msg: WebviewSaveMessage | WebviewAutoSaveMessage | WebviewReaderDispatchMessage): Promise<boolean> {
+    private async persist(msg: WebviewSaveMessage | WebviewAutoSaveMessage): Promise<boolean> {
         const flushId = 'flushId' in msg ? msg.flushId : undefined;
         let success = false;
         try {
@@ -482,6 +471,7 @@ export class WebviewBridge implements vscode.Disposable {
         try {
             const content = await fs.readFile(uris[0].fsPath, 'utf-8');
             if (this.isDirty && !await this.flushEdits(true)) { return; }
+            this.cancelNoteRuns();
             this.setFilePath(uris[0].fsPath);
             this.sendLoad(content, this.filePath);
         } catch (error) {
@@ -552,6 +542,7 @@ export class WebviewBridge implements vscode.Disposable {
     }
 
     private handleNewFile(): void {
+        this.cancelNoteRuns();
         this.filePath = undefined;
         this.store.setPath('');
         this.watchFile();
@@ -577,16 +568,14 @@ export class WebviewBridge implements vscode.Disposable {
         for (const resolve of this.flushWaiters.values()) { resolve(false); }
         this.flushWaiters.clear();
         this.frozenFlushes.clear();
-        this.cancelAllRequests();
+        this.cancelNoteRuns();
         this.disposables.forEach(d => d.dispose());
         this.disposables = [];
     }
 
-    private cancelAllRequests(): void {
-        for (const [, state] of this.activeRequests) {
-            state.cancelled = true;
-        }
-        this.activeRequests.clear();
+    private cancelNoteRuns(): void {
+        for (const run of this.noteRuns.values()) { run.abort(); }
+        this.noteRuns.clear();
     }
 }
 

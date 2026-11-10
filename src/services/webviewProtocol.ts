@@ -25,17 +25,36 @@ export interface WebviewStatsMessage {
     stats: EditorDocumentStats;
 }
 
-export interface WebviewBBRequestMessage {
-    type: 'bb-request';
-    id: string;
-    cmd: string;
-    selectText: string;
-    msg: string;
+/** What a margin note is about: one block, a heading's whole section, or several adjacent blocks. */
+export type NoteScopeKind = 'block' | 'section' | 'range';
+
+/** One earlier turn of a note, as plain text for the agent. */
+export interface NoteTurnWire {
+    role: 'me' | 'ai';
+    text: string;
 }
 
-export interface WebviewBBCancelMessage {
-    type: 'bb-cancel';
-    id: string;
+/** The writer left a sentence beside some blocks; the host hands it to the agent. */
+export interface WebviewNoteAskMessage {
+    type: 'note-ask';
+    requestId: string;
+    question: string;
+    scopeKind: NoteScopeKind;
+    /** Markdown of the blocks in scope, as they are in the editor right now. */
+    scopeMarkdown: string;
+    quote?: string;
+    history: NoteTurnWire[];
+}
+
+export interface WebviewNoteCancelMessage {
+    type: 'note-cancel';
+    requestId: string;
+}
+
+/** The document's notes, to be kept by the host. Opaque to it: the webview owns the shape. */
+export interface WebviewNotesSaveMessage {
+    type: 'notes-save';
+    notes: unknown[];
 }
 
 export interface WebviewSaveMessage extends WebviewEditMetadata {
@@ -86,14 +105,6 @@ export interface WebviewConflictResolveMessage {
     conflictId: number;
 }
 
-export interface WebviewReaderDispatchMessage extends WebviewEditMetadata {
-    type: 'reader-dispatch';
-    cmd: string;
-    msg: string;
-    content: string;   // full Markdown with the render tag already removed
-    frontmatter: string;
-}
-
 /** Zen: centered, distraction-free writing and reading. Editor: full width with line numbers and frontmatter. */
 export type LayoutMode = 'zen' | 'editor';
 
@@ -128,8 +139,9 @@ export interface WebviewFlushFailedMessage {
 
 export type WebviewMessage =
     | WebviewReadyMessage
-    | WebviewBBRequestMessage
-    | WebviewBBCancelMessage
+    | WebviewNoteAskMessage
+    | WebviewNoteCancelMessage
+    | WebviewNotesSaveMessage
     | WebviewSaveMessage
     | WebviewOpenFileMessage
     | WebviewNewFileMessage
@@ -138,7 +150,6 @@ export type WebviewMessage =
     | WebviewDraftMessage
     | WebviewFileUploadMessage
     | WebviewConflictResolveMessage
-    | WebviewReaderDispatchMessage
     | WebviewToggleLayoutModeMessage
     | WebviewFlushNoopMessage
     | WebviewFlushFailedMessage
@@ -160,23 +171,34 @@ export interface HostLoadMessage {
     expectedEditVersion?: number;
 }
 
-export interface HostChunkMessage {
-    type: 'chunk';
-    id: string;
-    text: string;
-    replace?: boolean;
+/** What the agent is doing right now, in a few words. */
+export interface HostNoteProgressMessage {
+    type: 'note-progress';
+    requestId: string;
+    step: string;
 }
 
-export interface HostDoneMessage {
-    type: 'done';
-    id: string;
-    fullText: string;
+export interface HostNoteDoneMessage {
+    type: 'note-done';
+    requestId: string;
+    /** The answer, Markdown. */
+    reply: string;
+    /** A rewrite of the whole scope, when the writer asked for changes. Never applied by the host. */
+    replacement?: string;
+    agent: string;
+    seconds: number;
 }
 
-export interface HostErrorMessage {
-    type: 'error';
-    id: string;
+export interface HostNoteErrorMessage {
+    type: 'note-error';
+    requestId: string;
     message: string;
+}
+
+/** Notes saved for this document earlier; sent once after each fresh load. */
+export interface HostNotesLoadMessage {
+    type: 'notes-load';
+    notes: unknown[];
 }
 
 export interface HostSavedMessage {
@@ -238,9 +260,10 @@ export interface HostNoticeMessage { type: 'notice'; message: string; }
 
 export type HostMessage =
     | HostLoadMessage
-    | HostChunkMessage
-    | HostDoneMessage
-    | HostErrorMessage
+    | HostNoteProgressMessage
+    | HostNoteDoneMessage
+    | HostNoteErrorMessage
+    | HostNotesLoadMessage
     | HostSavedMessage
     | HostNoticeMessage
     | HostThemeMessage
@@ -251,62 +274,3 @@ export type HostMessage =
     | HostRequestSaveMessage
     | HostEditUnlockMessage
     | HostRebaseMessage;
-
-// ===== Reader Webview ↔ Extension Host =====
-
-// Webview → Host
-export interface ReaderReadyMessage { type: 'reader-ready'; }
-export interface ReaderRegenerateMessage {
-    type: 'reader-regenerate';
-    userPrompt?: string;   // if present, replaces the current prompt before regen
-}
-export interface ReaderExportMessage { type: 'reader-export'; }
-
-export type ReaderWebviewMessage =
-    | ReaderReadyMessage
-    | ReaderRegenerateMessage
-    | ReaderExportMessage;
-
-// Host → Webview
-export interface ReaderInitMessage {
-    type: 'reader-init';
-    sourceFileName: string;        // basename for the title bar
-    preset: string;                // human-readable preset name (e.g. "Blog View")
-    userPrompt: string;            // empty string if not provided
-    baseUri: string;               // webview URI to source's directory (for image rewriting)
-    estInputTokens: number;        // heuristic chars/4
-    styleReferenceName?: string;   // basename of the loaded .bbreader.md, if any
-}
-export interface ReaderStartMessage { type: 'reader-start'; }
-export interface ReaderChunkMessage { type: 'reader-chunk'; text: string; }
-export interface ReaderDoneMessage {
-    type: 'reader-done';
-    fullHtml: string;
-    tokensUsed: number;
-    costUsd?: number;
-    durationMs: number;
-}
-export interface ReaderErrorMessage { type: 'reader-error'; message: string; }
-export interface ReaderSourceChangedMessage { type: 'reader-source-changed'; }
-export interface ReaderSourceClosedMessage { type: 'reader-source-closed'; }
-export interface ReaderExportResultMessage {
-    type: 'reader-export-result';
-    success: boolean;
-    filePath?: string;
-    error?: string;
-}
-export interface ReaderThemeMessage {
-    type: 'reader-theme';
-    kind: 'light' | 'dark' | 'highContrast';
-}
-
-export type ReaderHostMessage =
-    | ReaderInitMessage
-    | ReaderStartMessage
-    | ReaderChunkMessage
-    | ReaderDoneMessage
-    | ReaderErrorMessage
-    | ReaderSourceChangedMessage
-    | ReaderSourceClosedMessage
-    | ReaderExportResultMessage
-    | ReaderThemeMessage;

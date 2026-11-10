@@ -683,79 +683,6 @@ body:not([data-theme="light"]) .milkdown pre code .token.variable {
     border-radius: 4px;
 }
 
-/* ===== AI Block ===== */
-
-.ai-block {
-    margin: 12px 0;
-    border-radius: 6px;
-    overflow: hidden;
-    transition: all 0.2s ease;
-}
-
-.ai-block--processing {
-    border: 1px solid var(--vscode-inputValidation-infoBorder, #007acc);
-    background: var(--vscode-inputValidation-infoBackground, rgba(0, 122, 204, 0.1));
-}
-
-.ai-block--error {
-    border: 1px solid var(--vscode-inputValidation-errorBorder, #be1100);
-    background: var(--vscode-inputValidation-errorBackground, rgba(190, 17, 0, 0.1));
-}
-
-.ai-block__header {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 6px 12px;
-    font-size: 12px;
-    color: var(--vscode-descriptionForeground, #888);
-    border-bottom: 1px solid rgba(128, 128, 128, 0.2);
-}
-
-.ai-block__label {
-    font-weight: 500;
-    flex: 1;
-}
-
-.ai-block__close {
-    background: none;
-    border: none;
-    color: var(--vscode-descriptionForeground, #888);
-    cursor: pointer;
-    font-size: 14px;
-    padding: 0 4px;
-    line-height: 1;
-}
-
-.ai-block__close:hover {
-    color: var(--vscode-editor-foreground, #ccc);
-}
-
-.ai-block__content {
-    padding: 12px 16px;
-    font-size: 14px;
-    line-height: 1.6;
-    white-space: pre-wrap;
-    word-break: break-word;
-    min-height: 40px;
-    color: var(--vscode-editor-foreground);
-}
-
-/* Spinner animation */
-.ai-block__spinner {
-    display: inline-block;
-    width: 14px;
-    height: 14px;
-    border: 2px solid rgba(128, 128, 128, 0.3);
-    border-top-color: var(--vscode-progressBar-background, #FFD900);
-    border-radius: 50%;
-    animation: ai-block-spin 0.8s linear infinite;
-}
-
-@keyframes ai-block-spin {
-    to { transform: rotate(360deg); }
-}
-
 /* ===== Slash Menu ===== */
 
 .bb-slash-dropdown {
@@ -792,12 +719,6 @@ body:not([data-theme="light"]) .milkdown pre code .token.variable {
     background: var(--vscode-menu-selectionBackground, #094771);
 }
 
-.bb-slash-separator {
-    height: 1px;
-    margin: 4px 8px;
-    background: var(--vscode-menu-separatorBackground, rgba(128, 128, 128, 0.3));
-}
-
 .bb-slash-item__label {
     font-size: 13px;
     font-weight: 500;
@@ -808,56 +729,6 @@ body:not([data-theme="light"]) .milkdown pre code .token.variable {
     font-size: 11px;
     color: var(--vscode-descriptionForeground, #888);
     margin-top: 1px;
-}
-
-/* ===== Inline Input Overlay ===== */
-
-.bb-input-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.3);
-    display: flex;
-    align-items: flex-start;
-    justify-content: center;
-    padding-top: 20vh;
-    z-index: 9999;
-}
-
-.bb-input-container {
-    background: var(--vscode-input-background, #3c3c3c);
-    border: 1px solid var(--vscode-input-border, #555);
-    border-radius: 6px;
-    padding: 8px 12px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    min-width: 400px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-}
-
-.bb-input-label {
-    font-size: 13px;
-    font-weight: 500;
-    color: var(--vscode-input-foreground, #ccc);
-    white-space: nowrap;
-}
-
-.bb-input-field {
-    flex: 1;
-    background: transparent;
-    border: none;
-    outline: none;
-    color: var(--vscode-input-foreground, #ccc);
-    font-size: 13px;
-    font-family: inherit;
-    padding: 4px 0;
-}
-
-.bb-input-field::placeholder {
-    color: var(--vscode-input-placeholderForeground, #888);
 }
 
 /* ===== Block Plugin Overrides ===== */
@@ -951,15 +822,150 @@ body:not([data-theme="light"]) .milkdown pre code .token.variable {
     border-radius: 4px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, .25);
 }
-.ai-block--ready { border: 1px solid var(--vscode-testing-iconPassed, #5a8); }
-.ai-block__header button {
-    padding: 4px 8px;
-    font: inherit;
-    color: inherit;
-    background: transparent;
-    border: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, .3));
-    border-radius: 4px;
-    cursor: pointer;
+
+/* ===== Margin notes =====
+ * A note is a sentence left beside some blocks, the agent's answer, and — when
+ * changes were asked for — a proposal shown block by block.
+ * What informs sits on the left: the rail beside the note's blocks, the sign
+ * beside each changed block, the summary line under the block. What acts sits
+ * on the right: accept / reject beside each changed block.
+ * None of it is in the document; the file changes only on accept. */
+
+body {
+    --bb-dim: var(--vscode-descriptionForeground, #888);
+    --bb-rule: var(--vscode-panel-border, rgba(128, 128, 128, 0.28));
+    --bb-add: var(--vscode-editorGutter-addedBackground, #2ea043);
+    --bb-del: var(--vscode-editorGutter-deletedBackground, #f85149);
+    --bb-mod: var(--vscode-editorGutter-modifiedBackground, #0078d4);
+    --bb-ins-bg: var(--vscode-diffEditor-insertedTextBackground, rgba(155, 185, 85, 0.2));
+    --bb-del-bg: var(--vscode-diffEditor-removedTextBackground, rgba(255, 0, 0, 0.2));
 }
-.ai-block__header button:hover { background: var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, .15)); }
-.ai-block__header button:focus-visible { outline: 2px solid var(--vscode-focusBorder, #007acc); }
+
+.bb-notes-layer { position: absolute; left: 0; top: 0; width: 100%; height: 0; pointer-events: none; z-index: 5; }
+.bb-notes-layer > * { position: absolute; pointer-events: auto; }
+.bb-notes-layer button, .bb-note button, .bb-inbox { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+.bb-notes-layer button:focus-visible, .bb-note button:focus-visible, .bb-inbox:focus-visible {
+    outline: 1px solid var(--vscode-focusBorder, #007acc); outline-offset: 2px; border-radius: 2px;
+}
+
+/* Rail: faint = read, solid = unread, marching dashes = the agent is working. */
+.bb-rail { left: 41px; width: 12px; color: var(--bb-dim); opacity: 0.4; transition: opacity 0.4s ease, color 0.4s ease; }
+.bb-rail::before { content: ''; position: absolute; left: 6px; top: 4px; bottom: 4px; width: 2px; border-radius: 1px; background: currentColor; }
+.bb-rail:hover, .bb-rail.is-open { opacity: 0.85; }
+.bb-rail.is-unread { opacity: 0.95; color: var(--vscode-editor-foreground); }
+.bb-rail.is-error { color: var(--vscode-errorForeground, #f48771); opacity: 0.8; }
+.bb-rail.is-working { opacity: 0.75; }
+.bb-rail.is-working::before, .bb-rail.is-preview::before {
+    background: repeating-linear-gradient(to bottom, currentColor 0 4px, transparent 4px 8px);
+}
+.bb-rail.is-working::before { animation: bb-march 0.9s linear infinite; }
+.bb-rail.is-preview { pointer-events: none; opacity: 0.7; }
+@keyframes bb-march { to { background-position: 0 8px; } }
+
+/* Changed blocks: sign and coloured bar on the left, accept / reject on the right. */
+.bb-sign { left: 35px; width: 12px; height: 18px; text-align: center; font: 12px/18px var(--vscode-editor-font-family, ui-monospace, monospace); user-select: none; }
+.bb-bar { left: 47px; width: 2px; border-radius: 1px; pointer-events: none; }
+.bb-sign.is-add { color: var(--bb-add); } .bb-bar.is-add { background: var(--bb-add); }
+.bb-sign.is-del { color: var(--bb-del); } .bb-bar.is-del { background: var(--bb-del); }
+.bb-sign.is-mod { color: var(--bb-mod); } .bb-bar.is-mod { background: var(--bb-mod); }
+.bb-ops { right: 12px; display: flex; gap: 2px; }
+.bb-ops button { width: 17px; height: 18px; border-radius: 3px; color: var(--bb-dim); font-size: 13px; line-height: 18px; opacity: 0.75; }
+.bb-ops button:hover { opacity: 1; color: var(--vscode-editor-foreground); background: var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, 0.15)); }
+
+.bb-ghost { left: 36px; width: 14px; height: 18px; color: var(--bb-dim); font-size: 12px; line-height: 18px; opacity: 0.35; transition: opacity 0.15s ease; }
+.bb-ghost:hover { opacity: 1; color: var(--vscode-editor-foreground); }
+body.bb-typing .bb-ghost { display: none; }
+
+.bb-ring {
+    display: inline-block; flex: none; width: 9px; height: 9px; border-radius: 50%;
+    border: 1px solid color-mix(in srgb, currentColor 28%, transparent); border-top-color: currentColor;
+    animation: bb-spin 1.2s linear infinite;
+}
+@keyframes bb-spin { to { transform: rotate(360deg); } }
+
+/* Ask: the slash-menu surface, floating under the caret; nothing in the document moves. */
+.bb-ask {
+    left: 56px; width: min(460px, calc(100% - 112px)); z-index: 20;
+    background: var(--vscode-menu-background, #252526); border: 1px solid var(--vscode-menu-border, #454545);
+    border-radius: 6px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+.bb-ask { display: flex; align-items: center; gap: 8px; padding: 6px 10px; }
+.bb-ask-glyph { color: var(--bb-dim); font-size: 12px; }
+.bb-ask input { flex: 1; min-width: 0; background: none; border: 0; outline: 0; color: var(--vscode-menu-foreground, inherit); font: 13px var(--vscode-font-family, sans-serif); }
+.bb-ask-scope, .bb-ask-key { flex: none; color: var(--bb-dim); font: 11px var(--vscode-editor-font-family, ui-monospace, monospace); opacity: 0.8; }
+.bb-ask-scope { max-width: 45%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* The note itself: one summary line under its block, expanding in place into the thread. */
+.milkdown .bb-note {
+    position: relative; margin: -9px 0 14px; font-size: 13px; line-height: 1.7;
+    white-space: normal; cursor: default; transition: opacity 0.4s ease;
+}
+.bb-note button { color: var(--bb-dim); }
+.bb-note button:hover { color: var(--vscode-editor-foreground); }
+.bb-note-ops { display: inline-flex; align-items: baseline; gap: 12px; margin-left: auto; font-size: 13px; }
+.bb-note-strip { display: flex; align-items: baseline; gap: 7px; width: 100%; font-size: 12.5px; line-height: 22px; text-align: left; white-space: nowrap; }
+.bb-note-g { flex: none; width: 12px; text-align: center; font-size: 11px; }
+.bb-note-ask { flex: 0 1 auto; max-width: 46%; overflow: hidden; text-overflow: ellipsis; }
+.bb-note-sep { flex: none; opacity: 0.5; }
+.bb-note-tail { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.bb-note-t { margin-left: 6px; }
+.bb-note.is-unread .bb-note-strip .bb-note-g, .bb-note.is-unread .bb-note-tail { color: var(--vscode-editor-foreground); }
+.bb-note.is-error .bb-note-strip .bb-note-g, .bb-note-e span { color: var(--vscode-errorForeground, #f48771); }
+
+.bb-note-x { position: absolute; top: 0; right: 0; width: 18px; font-size: 13px; line-height: 22px; opacity: 0; transition: opacity 0.12s ease; }
+.bb-note:hover .bb-note-x, .bb-note:focus-within .bb-note-x { opacity: 1; }
+.bb-note-q { display: flex; align-items: baseline; gap: 7px; padding-right: 22px; color: var(--bb-dim); }
+.bb-note-scope { opacity: 0.7; white-space: nowrap; font: 11px var(--vscode-editor-font-family, ui-monospace, monospace); }
+.bb-note-quote, .bb-note-a, .bb-note-p, .bb-note-w, .bb-note-e { padding-left: 19px; }
+.bb-note-quote { color: var(--bb-dim); opacity: 0.8; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bb-note-q + .bb-note-a, .bb-note-quote + .bb-note-a { margin-top: 3px; }
+.bb-note-a + .bb-note-q, .bb-note-p + .bb-note-q { margin-top: 9px; }
+.milkdown .bb-note-a p { margin: 0 0 0.45em; line-height: 1.7; }
+.milkdown .bb-note-a ul, .milkdown .bb-note-a ol { margin: 0 0 0.45em; }
+.milkdown .bb-note-a li { margin: 0.2em 0; }
+.bb-note-p, .bb-note-e { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 14px; margin-top: 2px; font-size: 12px; color: var(--bb-dim); }
+.bb-note-stat { font: 11px var(--vscode-editor-font-family, ui-monospace, monospace); }
+.bb-note-w { display: flex; align-items: center; gap: 8px; margin-top: 2px; font-size: 12px; color: var(--bb-dim); }
+.bb-note-f { display: flex; align-items: baseline; gap: 7px; margin-top: 5px; font-size: 12px; color: var(--bb-dim); }
+.bb-note-f .bb-note-meta { margin: 0 7px; }
+.bb-note-f button { font-size: 17px; line-height: 1; padding: 0 2px; }
+.bb-note-fu {
+    flex: 1; min-width: 0; padding: 2px 0; background: none; border: 0; outline: 0;
+    border-bottom: 1px solid transparent; color: var(--vscode-editor-foreground); font: 12px var(--vscode-font-family, sans-serif);
+}
+.bb-note-fu:hover { border-bottom-color: var(--bb-rule); }
+.bb-note-fu:focus { border-bottom-color: var(--vscode-focusBorder, #007acc); }
+.bb-note-meta { font: 11px var(--vscode-editor-font-family, ui-monospace, monospace); opacity: 0.7; white-space: nowrap; }
+
+/* Proposed changes, drawn over the blocks while their note is open. */
+.milkdown .bb-preview { cursor: default; }
+.bb-del { text-decoration: line-through; text-decoration-color: color-mix(in srgb, currentColor 55%, transparent); color: var(--bb-dim); background: var(--bb-del-bg); border-radius: 2px; }
+.bb-ins { background: var(--bb-ins-bg); border-radius: 2px; }
+.milkdown .bb-d-old { color: var(--bb-dim); margin-bottom: 0.35em; }
+.bb-d-old .bb-del { text-decoration: none; }
+.milkdown .bb-d-del { color: var(--bb-dim); background: color-mix(in srgb, var(--bb-del-bg) 45%, transparent); }
+.bb-d-add > *, li.bb-d-add { background: color-mix(in srgb, var(--bb-ins-bg) 45%, transparent); }
+.milkdown .bb-d-from { color: var(--bb-dim); opacity: 0.7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Unread count beside the Z / E toggle. */
+.bb-inbox {
+    position: fixed; top: 6px; right: 40px; z-index: 50; display: inline-flex; align-items: center; gap: 5px;
+    height: 26px; padding: 0 6px; border-radius: 4px; color: var(--bb-dim);
+    font: 11px/1 var(--vscode-editor-font-family, ui-monospace, monospace); opacity: 0.6; transition: opacity 0.2s ease;
+}
+.bb-inbox:hover { opacity: 1; background: var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, 0.15)); }
+.bb-inbox .bb-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--vscode-editor-foreground); }
+.bb-inbox b { font-weight: 500; color: var(--vscode-editor-foreground); }
+
+/* Zen Mode: notes stay legible while typing, just quieter. */
+body.bb-mode-zen.bb-typing .bb-inbox { opacity: 0; pointer-events: none; }
+body.bb-mode-zen.bb-typing .bb-rail { opacity: 0.3; }
+body.bb-mode-zen.bb-typing .bb-rail.is-unread { opacity: 0.75; }
+body.bb-mode-zen.bb-typing .bb-note.is-strip { opacity: 0.5; }
+body.bb-mode-zen.bb-typing .bb-note.is-strip.is-unread { opacity: 0.85; }
+
+@media (prefers-reduced-motion: reduce) {
+    .bb-rail.is-working::before, .bb-ring { animation: none; }
+    .bb-ring { border-style: dotted; border-color: currentColor; }
+    .bb-rail, .bb-note, .bb-inbox { transition: none; }
+}

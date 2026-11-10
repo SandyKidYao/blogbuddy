@@ -4,107 +4,106 @@
 
 # BlogBuddy
 
-**让 AI 指令活在你的 Markdown 里。**
-写一个标签，敲一组快捷键，看它原地解析。
+**VS Code 里的 Markdown 编辑器，你的 Agent 在页边干活。**
+在一段文字旁留一句话，接着写，忙完了再看回答。
 
-[![版本](https://img.shields.io/badge/version-0.0.13-FFD900.svg)](https://github.com/FulcrumStd/blogbuddy)
+[![Version](https://img.shields.io/badge/version-0.1.0-FFD900.svg)](https://github.com/FulcrumStd/blogbuddy)
 [![VS Code](https://img.shields.io/badge/VS%20Code-Extension-007ACC.svg)](https://marketplace.visualstudio.com/items?itemName=FulcrumStudio.blogbuddy)
-[![BB](https://img.shields.io/badge/created_with-BB-FFD900)](https://github.com/FulcrumStd/blogbuddy)
 
-[English README](../README.md) · [完整用户指南](help_CN.md) · [更新日志](../CHANGELOG.md)
+[English README](../README.md) · [完整指南](help_CN.md) · [更新日志](../CHANGELOG.md)
 
 </div>
 
 ---
 
-## 一句话说清楚
+## 出发点
 
-你在写 Markdown，需要 AI 帮忙——扩写、润色、翻译、摘要、画图。市面上的工具大多把你拽出去开个对话窗口，然后再回来，然后再出去。
+你在写东西，想查证一个说法、听听别的看法、把一段话收紧。聊天框会把对话变成主体，文档成了附件：把文字复制过去，交代背景，等它回答，再把有用的部分搬回来。
 
-**BlogBuddy 把这些"动词"直接搬进你的正文。** 在段落里写下 `<bb-expd:补充具体例子>` 这样的标签，按 `Cmd+B Cmd+B`，标签连同周围的文本块会被流式 AI 输出原地替换——光标都不用挪。
+**BlogBuddy 把这件事反过来。** 文档始终是主体，对话挂在它所针对的块旁边。按 `Cmd+B Cmd+B`，输入一句话，回车，光标立刻回到原处。回答会安静地出现在那个块下方，等你写到一个段落再看。
 
-这就是核心想法。剩下的事，是把它做扎实。
-
----
-
-## 一屏看懂
-
-```markdown
-机器学习正在改变软件的写法。
-<bb-expd:面向资深工程师读者扩写>
-```
-
-把光标停在这段，按 `Cmd+B Cmd+B`。标签消失，段落扩展，文字逐 token 流入。处理范围由光标位置自动推断——当前行、整段、或整个文档。
+不需要配置 API key。BlogBuddy 借用你已经在用的 Agent：**Claude Code** 或 **Codex**，在后台运行。
 
 ---
 
-## BB 标签词汇表
+## 旁注
 
-八条内联命令 + 四个 Reader 预设。所有标签都接受冒号后的可选指令，例如 `<bb-foo:换个角度说说 X>`。
+旁注是你留在某些块旁边的一句话，加上 Agent 的回答。旁注不会写进你的 Markdown 文件。
 
-| 标签 | 作用 |
+**提问**
+
+- 在 BB Editor 里按 `Cmd+B Cmd+B` / `Ctrl+B Ctrl+B`（或点块左侧淡淡的 `※`）。出现一行输入框：输入，按 `↵`。
+- 以块为单位。问的是什么，取决于光标在哪里：
+
+| 光标或选区 | 旁注针对的范围 |
 |---|---|
-| `<bb:任意指令>` | 自由模式。把任务直接交给 BB，它在当前范围内处理。最灵活的兜底 |
-| `<bb-expd:重点>` | 在当前文风下扩写、补例 |
-| `<bb-impv:风格要求>` | 润色。内联模式重写当前块；标签独立成块时重写整篇为 `*_improved.md` |
-| `<bb-tslt:目标语言>` | 翻译整篇。输出 `myblog_日本語.md` 并附链接 |
-| `<bb-tldr:摘要风格>` | 内联生成 TL;DR |
-| `<bb-mmd:图表类型>` | 生成 ` ```mermaid ` 围栏代码块。自动挑选 flowchart / sequence / class / state / ER / gantt / pie |
-| `<bb-kwd:重点>` | 提取 8–12 个 SEO 友好的关键词 |
-| `<bb-tag>` | 插入一枚 "created with BB" 署名徽章 |
-| `<bb-render-blog:>` `<bb-render-skim:>` `<bb-render-expl:>` `<bb-render:prompt>` | AI 阅读视图——下面详述 |
+| 在段落、列表、代码块、引用或表格里 | 这个块 |
+| 在标题上 | 标题下的整节 |
+| 选区跨了几个块 | 这几个块 |
+| 选区在一个块之内 | 这个块，并引用选中的文字 |
 
-> **始终流式。** 输出随模型生成实时显示。**上下文感知。** BB 读取整篇文档，不只是选中的几行。**智能范围。** 仅凭光标位置就能判断是改一行、改一段、还是改全文。
+输入框里用 Markdown 自己的记号标出你要问的范围：`¶` 是段落，`## 标题` 是整节，`-` 是列表，` ``` ` 是代码，`>` 是引用，`¶×3` 是三个块，`“…”` 是选中的文字。
 
----
+**你接着写的时候**
 
-## BB 编辑器 —— 一个尊重 Markdown 的 WYSIWYG
+- 块下方出现一行摘要，左侧有一条竖条。流动的虚线表示 Agent 在处理，摘要行用符号显示它正在做什么：`⌕ 关键词` 是搜索，`↗ 域名` 是读网页，文件名是读文件，`✎` 是在写回答。
+- 回答到达时只有这一行变化：竖条变实，摘要行显示回答的开头。不弹通知，也不移动光标。
+- 右上角的小计数显示未读旁注数，点击跳到下一条。
 
-基于 [Milkdown](https://milkdown.dev) 的内置富文本 `.md` 编辑器。按 `Cmd+Shift+B` / `Ctrl+Shift+B` 打开 —— 在文件管理器选中 `.md`，或 VS Code 已经用文本编辑器打开了一个 `.md` 都可以（后者会原地把 VS Code 编辑器换成 BB 编辑器）。编辑器标题栏的 BB 图标也走同一个入口。落盘是干净的 Markdown，规范化方式可预测。
+**阅读和追问**
 
-- **WYSIWYG + 完整 GFM** —— 表格、删除线、任务列表、自动链接、引用块、围栏代码
-- **斜杠菜单（`/`）** —— 块类型 + 全部 BB 命令，预填好
-- **内联 `Cmd+B Cmd+B`** —— 不切上下文触发任意 `<bb-*>` 标签
-- **流式 AI 块** —— 结果以一个 ProseMirror 类型节点的形式内联出现
-- **Frontmatter 类型化面板** —— `title` · `date` · `tags` · `categories` · `author` · `slug` · `draft` · `description` 渲染为类型化控件（日期选择器、chip、开关、textarea）。原始 YAML 仍作为可折叠兜底保留
-- **Prism 语法高亮** —— 20+ 种语言；配色跟随 VS Code 明/暗/高对比度主题
-- **IME 友好** —— CJK 组合事件期间禁用自动保存和 BB 触发
-- **Arrow 连字** —— 代码块和 IME 之外，`->` → `→`，`=>` → `⇒`
-- **紧凑保存** —— bullet 统一为 `-`、多余空行合并、HTML 实体解码——Git diff 保持安静
-- **外部修改横幅** —— 你有未保存编辑时文件被外部改动，提示 Reload 或 Keep
-- **粘贴即落盘** —— 图片和文件粘贴/拖入会写到文档同目录（或 `blogbuddy.assetDir`），以相对路径插入
-- **Zen / Read 布局切换** —— 右上角小 `Z` / `R` 按钮，在 Zen 模式（居中 860px，专注写作）和 Read 模式（铺满视口，长篇阅读更舒服）之间切换。选择跨会话保留
-- **自动保存** + `Cmd+S` 立即 flush
+- 点摘要行，在原地展开对话。最后一行以 `※` 开头：在那里输入就是追问，Agent 会带上这条旁注之前的内容。
+- 看完了点 `∎`，旁注就从文档旁移除；`⌃` 只是把它收回成一行。
 
----
+**修改以建议的形式出现**
 
-## AI 阅读视图 —— 重新设计你的 Markdown
+当你要求改动（"收紧一点"、"检查错别字"、"把这一节重新组织一下"），Agent 不会动文件。它交回一份修改稿，BB Editor 在旁注展开时按块显示差异：
 
-触发 `<bb-render-*>`，AI 把你的文档重新诠释为一份完整 HTML "阅读 artifact"，渲染在侧边面板，永远不动你的源文件。
-
-| 预设 | 给模型的简报 |
+| 左侧记号 | 含义 |
 |---|---|
-| `<bb-render-blog:>` | 精致博客文 —— 黏性 TOC、callout、舒适行宽 |
-| `<bb-render-skim:>` | 顶端 TL;DR、密集的视觉结构、`<details>` 折叠可跳过的细节 |
-| `<bb-render-expl:>` | 教学 artifact —— SVG 图示、代码注释、"why this matters" 侧栏 |
-| `<bb-render:你的 prompt>` | 自定义 —— 你的 prompt 主导整个创作方向 |
+| `~` | 原地改写，增删直接标在文字上 |
+| `−` 在上，`+` 在下 | 大幅改写，旧块在上、新块在下 |
+| `+` | 新增的块 |
+| `−` | 删除的块 |
+| `⤷` 和 `↑` / `↓` | 移动的块：新位置显示全文，原位置缩成一行 |
 
-- **沙盒 iframe 内的流式实时预览** —— 看着 HTML 自己长出来
-- **可编辑的提示词 + Regenerate** —— 改 prompt 不用重写标签
-- **导出为单文件 `.html`** —— 默认把本地图片 base64 内嵌（设 `blogbuddy.reader.inlineAssets` 为 `false` 可保留相对路径）
-- **`.bbreader.md` 样式参考**（可选）—— 在工作区根放一份，描述你博客的字体、配色、组件等；每次 render 都会作为权威样式指南被读入。跑 **BlogBuddy: Create .bbreader.md Template** 生成模板
-- **源文件改动横幅** —— 按需手动重渲，绝不自动触发（render 又慢又费 token）
-- **成本守门**（约 25k 输入 token）—— 大文件先弹确认再花钱
+- 每个改动的块右侧有 `✓` / `×`，可以单独接受或放弃。旁注里用同一套记号统计还剩什么（`~2 +1 −1 ⤷1`），并有一组针对全部改动的 `✓` / `×`。
+- 接受就是一次普通的编辑，`Cmd+Z` 可以撤销。在你接受之前，磁盘上的文件不变，自动保存不受影响。
+- 有建议挂着的时候你可以照常编辑。如果你改了建议想改的那个块，这一处会失效，不会覆盖你的修改。
+
+**Agent 能做什么**
+
+- 它以只读方式运行：可以读工作区里的文件、联网搜索，不能写文件，也不能执行会改动东西的命令。
+- 每次提问会在后台启动一次你的 Agent，用的是那个 Agent 自己的账号和额度。
+- 旁注按文档保存在 VS Code 的扩展存储里，不会在你的仓库里产生任何文件。
+
+---
+
+## BB Editor：尊重 Markdown 的所见即所得
+
+基于 [Milkdown](https://milkdown.dev) 的 `.md` 富文本编辑器。用 `Cmd+Shift+B` / `Ctrl+Shift+B` 打开：可以在资源管理器里选中 `.md` 文件，也可以在 VS Code 文本编辑器里打开着 `.md` 时直接原地切换。同一个快捷键切回 Markdown 源码。
+
+- **完整 GFM 的所见即所得**：表格、删除线、任务列表、自动链接、引用、代码块
+- **斜杠菜单（`/`）**：块类型
+- **Frontmatter 头部**：就是文件里的 `---` 围栏，`title`、`date`、`tags`、`categories`、`author`、`slug`、`draft`、`description` 原地编辑，一键切到原始 YAML
+- **源码行号**：每个块显示它在 `.md` 文件里的行号
+- **Prism 语法高亮**：20 多种语言，配色跟随 VS Code 的浅色、深色和高对比主题
+- **输入法安全**：中日韩输入法组字过程不会进入自动保存
+- **箭头连字**：`->` → `→`，`=>` → `⇒`，代码和组字中除外
+- **安静的保存**：没改过的块保留原始字节，Git diff 保持很小
+- **外部修改提示**：有未保存修改时文件被外部改动，会让你选择加载外部版本或保留当前版本
+- **粘贴即落盘**：拖入或粘贴的图片和文件写到文档旁（或 `blogbuddy.assetDir` 下），以相对路径插入
+- **Zen / Editor 模式**：右上角的 `Z` / `E` 小按钮。Zen 是居中的专注栏，打字时界面元素淡出；Editor 是全宽，带行号和 frontmatter 头部
+- **自动保存**，`Cmd+S` 立即保存
 
 ---
 
 ## 快速开始
 
-1. 从 VS Code Marketplace 安装 **BlogBuddy**。
-2. 配置凭证 —— 在设置里填 `blogbuddy.apiKey`，**或者**导出 `BLOGBUDDY_API_KEY`（或 `OPENAI_API_KEY`）。
-3. *（可选）* 设置 `blogbuddy.baseURL` 切换到 OpenAI 兼容的 provider（OpenRouter、DeepSeek、自建代理）。默认值：`https://api.openai.com/v1`。
-4. 在命令面板跑 **BlogBuddy: Select Model** —— 从 `/v1/models` 列表选一个，或手动输入。
-5. 打开任意 `.md` 文件，插入标签，按 `Cmd+B Cmd+B`。
+1. 从 VS Code 插件市场安装 **BlogBuddy**。
+2. 确认 **Claude Code**（`claude`）或 **Codex**（`codex`）已安装并登录。BlogBuddy 用它找到的第一个，先找 Claude Code。
+3. 打开一个 `.md` 文件，按 `Cmd+Shift+B` 进入 BB Editor。
+4. 把光标放进一段文字，按 `Cmd+B Cmd+B`，问一句，然后接着写。
 
 ---
 
@@ -112,66 +111,46 @@
 
 ### 快捷键
 
-| 场景 | 快捷键 | 操作 |
+| 位置 | 快捷键 | 作用 |
 |---|---|---|
-| Markdown 编辑器 | `Cmd+B Cmd+B` / `Ctrl+B Ctrl+B` | 在当前块或选区上执行 BB 命令 |
-| 文件管理器（选中 `.md`）或打开的 Markdown 编辑器 | `Cmd+Shift+B` / `Ctrl+Shift+B` | 打开 BB 编辑器（在 VS Code 编辑器里就原地切换） |
-| BB 编辑器 | `/` | 斜杠菜单（BB 命令 + 块类型） |
-| BB 编辑器 | `Cmd+B Cmd+B` | 触发内联 `<bb-*>` 标签 |
-| BB 编辑器 | `Cmd+S` | 立即保存 |
-| BB 编辑器 | `Backspace`（标题行开头） | 把标题转回普通段落 |
+| 资源管理器（选中 `.md`）或 Markdown 文本编辑器 | `Cmd+Shift+B` / `Ctrl+Shift+B` | 打开 BB Editor |
+| BB Editor | `Cmd+Shift+B` / `Ctrl+Shift+B` | 回到 Markdown 源码 |
+| BB Editor | `Cmd+B Cmd+B` / `Ctrl+B Ctrl+B` | 对当前块、整节或选区提问 |
+| BB Editor | `Cmd+B` / `Ctrl+B` | 加粗 |
+| BB Editor | `/` | 斜杠菜单 |
+| BB Editor | `Cmd+S` | 立即保存 |
+| BB Editor | `Backspace`（在标题开头） | 把标题变回段落 |
 
 ### 设置
 
-只有 `apiKey` 和 `model` 是必填，其余都有合理默认值。
-
-| Key | 说明 |
+| 设置项 | 说明 |
 |---|---|
-| `blogbuddy.apiKey` | API key。依次回退到 `$BLOGBUDDY_API_KEY` → `$OPENAI_API_KEY` |
-| `blogbuddy.baseURL` | OpenAI 兼容 base URL。依次回退到 `$BLOGBUDDY_BASE_URL` → `$OPENAI_BASE_URL` → `https://api.openai.com/v1` |
-| `blogbuddy.model` | 模型 id。推荐跑 **BlogBuddy: Select Model** 从 provider 列表里选 |
-| `blogbuddy.assetDir` | BB 编辑器资源上传的相对子目录（如 `assets`）。留空 = 保存在文档同目录 |
-| `blogbuddy.reader.inlineAssets` | Reader 导出时是否把本地图片 base64 内嵌成单文件 HTML。默认 `true` |
+| `blogbuddy.agent` | 由哪个 Agent 回答旁注：`auto`（默认，先 Claude Code 后 Codex）、`claude` 或 `codex` |
+| `blogbuddy.assetDir` | BB Editor 上传资源的相对子目录（如 `assets`）。留空则与文档同目录 |
 
 ### 命令
 
-打开命令面板（`Cmd+Shift+P` / `Ctrl+Shift+P`），输入 `BlogBuddy:`。
-
 | 命令 | 用途 |
 |---|---|
-| `BlogBuddy: Hi BB` | 在当前范围执行 BB 命令（等同于快捷键） |
-| `BlogBuddy: Open BB Editor` | 用 BB 编辑器打开当前 `.md` |
-| `BlogBuddy: Select Model` | 拉 `/v1/models` 列表，选一个或输入自定义 id |
-| `BlogBuddy: Show Config Diagnostics` | 脱敏报告——扩展实际读到每个字段的值和来源 |
-| `BlogBuddy: Show Usage Statistics` | Token 用量、请求次数、按模型计费（有定价数据时） |
-| `BlogBuddy: Reset Usage Statistics` | 清空计数器（带确认） |
-| `BlogBuddy: Refresh Pricing Data` | 重新拉定价数据 |
-| `BlogBuddy: Create .bbreader.md Template` | 在工作区根创建 AI Reader 样式参考模板 |
+| `BlogBuddy: Open BB Editor` | 用 BB Editor 打开当前 `.md` |
+| `BlogBuddy: Reopen as Markdown Source` | 把当前 BB Editor 切回文本编辑器 |
 
 ### 状态栏
 
-右侧两个小项，仅 Markdown 文件可见：
-
-- **字数统计** —— 中文字符与英文单词分别计数后求和
-- **配置来源** —— `$(key) BB · cfg | env | default` 显示 `apiKey` 的来源；缺 key 或缺 model 时变黄。Hover 看每字段来源表，点击打开诊断
+Markdown 文件和 BB Editor 的**字数统计**：中文字符和英文单词分别计数后相加，提示里有选中字数、字符数和行数。
 
 ---
 
-## 备注
+## 说明
 
-> **开发状态。** BlogBuddy 处于积极开发中。功能可能在版本之间移动、损坏或变更。生产工作流中请谨慎使用。
+> **开发状态。** BlogBuddy 仍在积极开发中，功能可能调整或变化。
 >
-> **实验性。** 自由模式 `<bb:>` 最灵活也最耗 token——能用专用标签解决就别用 `<bb>`。
+> **从旧版本升级？** `<bb-*>` 标签、AI Reader View，以及 API key 和模型相关的设置都已移除。现在所有 AI 协作都通过 BB Editor 里的旁注进行，使用你自己的 Agent 命令行工具。
 
 <details>
-<summary><strong>macOS —— 环境变量没读到？</strong></summary>
+<summary><strong>"没有找到 claude 或 codex 命令"</strong></summary>
 
-从 Dock 或 Spotlight 启动的 App 不会继承你的 shell 配置。两个办法：
-
-- **从终端启动**：`source ~/.zshrc && code .`
-- **持久化**：`launchctl setenv OPENAI_API_KEY 'sk-...'`，然后 ⌘Q 彻底退出再重启 VS Code
-
-跑 **BlogBuddy: Show Config Diagnostics** 看扩展实际读到了什么。
+BlogBuddy 会在 VS Code 的 `PATH`、登录 shell 的 `PATH` 和常见安装位置（`~/.local/bin`、`/opt/homebrew/bin`、`/usr/local/bin` 等）里找 Agent。如果还是找不到，先确认在新开的终端里 `claude --version` 或 `codex --version` 能运行，然后重启 VS Code。
 
 </details>
 
@@ -179,14 +158,14 @@
 
 ## 适合谁
 
-博客作者和内容创作者 · 需要图表和翻译的技术写作者 · 多语言博主 · 比起开新标签页更愿意按个快捷键的人。
+用 Markdown 写博客和技术文档、已经在用 Agent、又不想为了和它说话而离开页面的人。
 
 ## 反馈
 
-发现 bug 或想要新功能 → [提交 issue](https://github.com/FulcrumStd/blogbuddy/issues)。
+Bug 或功能建议 → [提交 issue](https://github.com/FulcrumStd/blogbuddy/issues)。
 
 ---
 
 <div align="center">
-<sub>为在 Markdown 里写作的人精心打造。</sub>
+<sub>为用 Markdown 写作的人用心打造。</sub>
 </div>

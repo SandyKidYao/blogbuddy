@@ -1,9 +1,11 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs/promises';
+import * as os from 'os';
 import * as path from 'path';
 import { WebviewBridge } from '../services/WebviewBridge';
-import { ReaderPanel } from './readerCommand';
-import { isRenderCmd } from '../core/reader';
+import { NoteAssistant } from '../core/notes';
+import { ConfigService } from '../services/ConfigService';
+import { NoteStore } from '../services/NoteStore';
 import { editorStatus } from '../services/EditorStatus';
 import type { LayoutMode } from '../services/webviewProtocol';
 
@@ -180,11 +182,22 @@ class EditorPanel implements vscode.Disposable {
             })
         );
 
+        const noteStore = new NoteStore(context.globalState);
         this.bridge = new WebviewBridge(this.panel, this.panel.webview, {
             filePath: this.filePath,
+            askNote: (ask, onStep, signal) => {
+                const docPath = this.bridge.currentFilePath;
+                const folder = docPath && vscode.workspace.getWorkspaceFolder(vscode.Uri.file(docPath))?.uri.fsPath;
+                return NoteAssistant.ask({
+                    question: ask.question, scopeKind: ask.scopeKind, scopeMarkdown: ask.scopeMarkdown,
+                    quote: ask.quote, history: ask.history, filePath: docPath,
+                    cwd: folder || (docPath ? path.dirname(docPath) : os.homedir()),
+                }, ConfigService.getInstance().getAllConfig().agent, onStep, signal);
+            },
+            loadNotes: (file) => noteStore.load(file),
+            saveNotes: (file, notes) => noteStore.save(file, notes),
             onDirtyChange: (dirty) => this.setDirty(dirty),
             onReady: () => this.onWebviewReady(),
-            onReaderDispatch: (cmd, msgText, content) => this.handleReaderDispatch(cmd, msgText, content),
             onToggleLayoutMode: () => this.toggleLayoutMode(),
             onStatsChange: (stats) => editorStatus.update(this.statusId, stats),
             onRecoverDraft: (content) => {
@@ -239,24 +252,6 @@ class EditorPanel implements vscode.Disposable {
             }
         } else {
             this.bridge.sendLoad('');
-        }
-    }
-
-    private async handleReaderDispatch(cmd: string, msgText: string, content: string): Promise<void> {
-        if (!this.filePath) {
-            vscode.window.showInformationMessage('Save the file first to use the AI Reader.');
-            return;
-        }
-        if (!isRenderCmd(cmd)) {
-            return;
-        }
-        try {
-            // The bridge has already committed and flushed the full snapshot.
-            const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(this.filePath));
-            await ReaderPanel.openForDocument(this.context, doc, cmd, msgText);
-        } catch (err) {
-            const message = err instanceof Error ? err.message : 'Unknown error';
-            vscode.window.showErrorMessage(`Failed to open AI Reader: ${message}`);
         }
     }
 

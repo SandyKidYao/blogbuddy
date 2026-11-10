@@ -121,15 +121,65 @@ suite('WebviewBridge save protocol', () => {
         assert.strictEqual(messages.filter(message => message.type === 'notice').length, 1);
         assert.ok(!messages.some(message => message.type === 'saved' && !message.success));
     });
-    test('the Reader on an untitled document reaches the command layer', async () => {
-        const dispatched: string[] = [];
-        const untitled = new WebviewBridge({ webview: { postMessage: () => Promise.resolve(true),
-            onDidReceiveMessage: (listener: (message: WebviewMessage) => Promise<void>) => { receive = listener; return new vscode.Disposable(() => {}); },
-        } } as unknown as vscode.WebviewPanel, {} as vscode.Webview, { onReaderDispatch: async cmd => { dispatched.push(cmd); } });
-        untitled.sendLoad('');
-        await receive({ type: 'reader-dispatch', cmd: 'bb-render', msg: '', content: '# Draft\n', frontmatter: '', revision: 1, editVersion: 1 });
-        untitled.dispose();
-        assert.deepStrictEqual(dispatched, ['bb-render']);
+    function noteBridge(options: ConstructorParameters<typeof WebviewBridge>[2]): { bridge: WebviewBridge; posted: HostMessage[]; send: (message: WebviewMessage) => Promise<void> } {
+        const posted: HostMessage[] = [];
+        let send: (message: WebviewMessage) => Promise<void> = async () => {};
+        const webview = {
+            onDidReceiveMessage: (listener: (message: WebviewMessage) => Promise<void>) => { send = listener; return new vscode.Disposable(() => {}); },
+            postMessage: (message: HostMessage) => { posted.push(message); return Promise.resolve(true); },
+            asWebviewUri: (uri: vscode.Uri) => uri,
+        } as unknown as vscode.Webview;
+        const noted = new WebviewBridge({ webview } as vscode.WebviewPanel, webview, { filePath: file, ...options });
+        noted.sendLoad('original\n', file);
+        return { bridge: noted, posted, send: message => send(message) };
+    }
+    const ask: WebviewMessage = { type: 'note-ask', requestId: 'r1', question: '收紧一点', scopeKind: 'block', scopeMarkdown: 'original', history: [] };
+
+    test('a margin note reaches the agent and its answer returns without touching the file', async () => {
+        const asked: string[] = [];
+        const { bridge: noted, posted, send } = noteBridge({ askNote: async (note, onStep) => {
+            asked.push(note.question); onStep('搜索：写作');
+            return { reply: '改好了', replacement: 'rewritten', agent: 'Claude Code', seconds: 3 };
+        } });
+        await send(ask);
+        noted.dispose();
+        assert.deepStrictEqual(asked, ['收紧一点']);
+        assert.ok(posted.some(message => message.type === 'note-progress' && message.step === '搜索：写作'));
+        const done = posted.find(message => message.type === 'note-done');
+        assert.ok(done?.type === 'note-done' && done.replacement === 'rewritten' && done.requestId === 'r1');
+        assert.strictEqual(await fs.readFile(file, 'utf8'), 'original\n');
+    });
+    test('a cancelled margin note reports neither an answer nor an error', async () => {
+        let release: () => void = () => {};
+        const { bridge: noted, posted, send } = noteBridge({ askNote: (_note, _onStep, signal) => new Promise((resolve, reject) => {
+            release = () => resolve({ reply: 'late', agent: 'Codex', seconds: 1 });
+            signal.addEventListener('abort', () => reject(new Error('已取消')));
+        }) });
+        const pending = send(ask);
+        await send({ type: 'note-cancel', requestId: 'r1' });
+        release();
+        await pending;
+        noted.dispose();
+        assert.ok(!posted.some(message => message.type === 'note-done' || message.type === 'note-error'));
+    });
+    test('an agent failure is reported on the note that asked', async () => {
+        const { bridge: noted, posted, send } = noteBridge({ askNote: async () => { throw new Error('没有找到 claude 或 codex 命令。'); } });
+        await send(ask);
+        noted.dispose();
+        const failed = posted.find(message => message.type === 'note-error');
+        assert.ok(failed?.type === 'note-error' && failed.requestId === 'r1' && failed.message.includes('claude'));
+    });
+    test('notes saved for a document come back when it is opened again', async () => {
+        const kept = new Map<string, unknown[]>();
+        const options = { loadNotes: (path: string) => kept.get(path) ?? [], saveNotes: (path: string, notes: unknown[]) => { kept.set(path, notes); } };
+        const first = noteBridge(options);
+        await first.send({ type: 'notes-save', notes: [{ id: 'n1' }] });
+        first.bridge.dispose();
+        const second = noteBridge(options);
+        second.bridge.dispose();
+        const loaded = second.posted.find(message => message.type === 'notes-load');
+        assert.ok(loaded?.type === 'notes-load');
+        assert.deepStrictEqual(loaded.notes, [{ id: 'n1' }]);
     });
 
     test('external content is not overwritten when a local autosave arrives', async () => {
