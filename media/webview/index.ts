@@ -638,6 +638,14 @@ document.getElementById('editor')?.addEventListener('mousedown', (e) => {
     }
 });
 
+// Scroll past end needs the scroll viewport height; percentages in padding resolve against width.
+const editorScroller = document.getElementById('editor');
+if (editorScroller) {
+    new ResizeObserver(() => {
+        editorScroller.style.setProperty('--bb-viewport-height', `${editorScroller.clientHeight}px`);
+    }).observe(editorScroller);
+}
+
 // Init
 initFrontmatterPanel();
 onFrontmatterChange(() => {

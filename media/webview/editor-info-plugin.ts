@@ -35,6 +35,25 @@ export function editorInfoPlugin(options: EditorInfoOptions): MilkdownPlugin {
         gutter.className = 'bb-source-gutter';
         gutter.setAttribute('aria-hidden', 'true');
         let observer: ResizeObserver;
+        const labels = new Map<number, HTMLElement>();
+        let activeLabel: HTMLElement | undefined;
+
+        /** Source line of the cursor, so only that number is emphasized. */
+        function cursorLine(): number | undefined {
+            const { $head } = view.state.selection;
+            if (!$head.parent.isTextblock) { return undefined; }
+            const line = sourceLines.get($head.before());
+            if (line === undefined || $head.parent.type.name !== 'code_block') { return line; }
+            return line + $head.parent.textBetween(0, $head.parentOffset).split('\n').length;
+        }
+
+        function markActiveLine(): void {
+            const next = (() => { const line = cursorLine(); return line === undefined ? undefined : labels.get(line); })();
+            if (next === activeLabel) { return; }
+            activeLabel?.classList.remove('is-active');
+            next?.classList.add('is-active');
+            activeLabel = next;
+        }
 
         function publishStats(): void {
             const selected = analyzer.analyze(view.state.doc.textBetween(view.state.selection.from, view.state.selection.to, '\n'));
@@ -50,32 +69,39 @@ export function editorInfoPlugin(options: EditorInfoOptions): MilkdownPlugin {
             const container = document.getElementById('editor');
             if (!container) { return; }
             const top = container.getBoundingClientRect().top - container.scrollTop;
-            const labels = new Set<number>();
+            labels.clear();
+            activeLabel = undefined;
             gutter.replaceChildren();
-            const label = (line: number, y: number): void => {
+            const lineHeight = (el: Element): number => {
+                const style = getComputedStyle(el);
+                return parseFloat(style.lineHeight) || parseFloat(style.fontSize) * 1.2;
+            };
+            // Each number takes its block's first-line height so it sits on that line's text, not above it.
+            const label = (line: number, y: number, height: number): void => {
                 if (labels.has(line)) { return; }
-                labels.add(line);
                 const item = document.createElement('span');
                 item.textContent = String(line);
                 item.style.top = `${y}px`;
+                item.style.lineHeight = `${height}px`;
+                labels.set(line, item);
                 gutter.append(item);
             };
             for (const [pos, line] of sourceLines) {
                 const dom = view.nodeDOM(pos);
                 if (!(dom instanceof HTMLElement) || !dom.getBoundingClientRect().height) { continue; }
-                label(line, dom.getBoundingClientRect().top - top);
                 const node = view.state.doc.nodeAt(pos);
-                if (node?.type.name === 'code_block') {
-                    const code = dom.querySelector('code');
-                    if (code) {
-                        const style = getComputedStyle(code);
-                        const height = parseFloat(style.lineHeight) || parseFloat(style.fontSize) * 1.2;
-                        for (let i = 0; i < node.textContent.split('\n').length; i++) {
-                            label(line + i + 1, code.getBoundingClientRect().top - top + i * height);
-                        }
+                const code = node?.type.name === 'code_block' ? dom.querySelector('code') : null;
+                if (code && node) {
+                    const height = lineHeight(code);
+                    label(line, dom.getBoundingClientRect().top - top, height);
+                    for (let i = 0; i < node.textContent.split('\n').length; i++) {
+                        label(line + i + 1, code.getBoundingClientRect().top - top + i * height, height);
                     }
+                } else {
+                    label(line, dom.getBoundingClientRect().top - top, lineHeight(dom));
                 }
             }
+            markActiveLine();
         }
 
         function refresh(): void {
@@ -145,7 +171,7 @@ export function editorInfoPlugin(options: EditorInfoOptions): MilkdownPlugin {
                     update(next, previous) {
                         view = next;
                         if (!previous.doc.eq(next.state.doc)) { schedule(); }
-                        else if (!previous.selection.eq(next.state.selection)) { publishStats(); }
+                        else if (!previous.selection.eq(next.state.selection)) { publishStats(); markActiveLine(); }
                     },
                     destroy() {
                         if (timer) { clearTimeout(timer); }

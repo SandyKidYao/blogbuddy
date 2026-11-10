@@ -431,6 +431,10 @@ body {
     padding: 0;
     outline: none;
     flex: 1;
+    /* Scroll past end: let the last line scroll up near the top of the
+     * viewport instead of forcing users to type at the bottom edge.
+     * --bb-viewport-height is the #editor height, kept in sync from index.ts. */
+    padding-bottom: max(0px, calc(var(--bb-viewport-height, 0px) - 6em));
 }
 
 /* Placeholder for empty editor */
@@ -877,10 +881,22 @@ body:not([data-theme="light"]) .milkdown pre code .token.variable {
     width: 20px;
     pointer-events: none;
     user-select: none;
-    color: var(--vscode-editorLineNumber-foreground, #999);
-    font: 11px/1.7 var(--vscode-editor-font-family, ui-monospace, monospace);
+    color: var(--vscode-editorLineNumber-foreground, #858585);
+    font: 10px/1.7 var(--vscode-editor-font-family, ui-monospace, monospace);
 }
-.bb-source-gutter > span { position: absolute; right: 0; font-variant-numeric: tabular-nums; }
+/* Line numbers are a quiet reference, not part of the reading surface:
+ * faint by default, only the cursor's line is brought forward. */
+.bb-source-gutter > span {
+    position: absolute;
+    right: 0;
+    font-variant-numeric: tabular-nums;
+    opacity: 0.35;
+    transition: opacity 0.15s ease;
+}
+.bb-source-gutter > span.is-active {
+    opacity: 1;
+    color: var(--vscode-editorLineNumber-activeForeground, var(--vscode-editor-foreground));
+}
 .bb-heading-hint { position: relative; }
 .bb-heading-hint::after {
     content: attr(data-heading-level);
