@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BlogBuddy — Talk to your agent in the margin</title>
+<meta name="description" content="A Markdown editor for VS Code where your agent works in the margin.">
+<style>
+:root{--paper:#faf7f0;--ink:#1c1b18;--mute:#6f6b60;--line:#e4dfd2;--hl:#ffd900;--ok:#2f7d4f;--no:#b3402f}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--paper);color:var(--ink);font:18px/1.7 Charter,"Iowan Old Style","Source Han Serif SC","Songti SC",Georgia,serif}
+a{color:inherit}
+.wrap{max-width:1040px;margin:0 auto;padding:0 28px}
+nav{display:flex;align-items:center;justify-content:space-between;padding:22px 0;font:600 15px/1 system-ui,sans-serif}
+nav .l{display:flex;align-items:center;gap:10px}nav img{width:34px;height:34px;border-radius:8px}
+nav .r{display:flex;gap:22px;color:var(--mute)}nav .r a{text-decoration:none}nav .r a:hover{color:var(--ink)}
+.hero{padding:70px 0 40px;text-align:left}
+.hero h1{font-size:clamp(40px,7vw,76px);line-height:1.04;margin:0 0 22px;letter-spacing:-.02em;font-weight:700}
+.hl{background:linear-gradient(transparent 58%,var(--hl) 58% 92%,transparent 92%);padding:0 .08em}
+.hero p{font-size:21px;color:var(--mute);max-width:640px;margin:0 0 30px}
+.cta{display:flex;gap:14px;flex-wrap:wrap;font:600 15px/1 system-ui,sans-serif}
+.btn{padding:14px 22px;border-radius:10px;text-decoration:none;border:1.5px solid var(--ink)}
+.btn.p{background:var(--ink);color:var(--paper)}.btn.p:hover{background:#000}
+.btn:hover{transform:translateY(-1px)}
+kbd{font:600 .8em ui-monospace,Menlo,monospace;background:#fff;border:1px solid var(--line);border-bottom-width:2px;border-radius:6px;padding:.08em .45em}
+/* mock editor */
+.stage{margin:46px 0 30px;background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:0 30px 60px -30px rgba(60,50,20,.28);overflow:hidden}
+.bar{display:flex;align-items:center;gap:8px;padding:12px 16px;border-bottom:1px solid var(--line);font:13px system-ui,sans-serif;color:var(--mute);background:#fcfbf7}
+.bar i{width:11px;height:11px;border-radius:50%;background:#e4dfd2}.bar b{margin-left:10px;font-weight:600;color:var(--ink)}
+.doc{padding:34px 56px 40px 74px;position:relative;font-size:19px}
+.doc h3{margin:0 0 14px;font-size:30px}
+.blk{position:relative;margin:0 0 6px;padding:2px 0}
+.blk .ask{position:absolute;left:-34px;top:2px;color:#cfc8b5;font:16px ui-monospace,monospace;cursor:default;transition:.2s}
+.blk:hover .ask,.blk.has .ask{color:#a8a08a}
+.note{position:relative;margin:2px 0 18px;padding-left:16px;font:14px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace}
+.rail{position:absolute;left:0;top:2px;bottom:2px;width:3px;border-radius:2px;background:repeating-linear-gradient(0deg,var(--hl) 0 6px,transparent 6px 11px);animation:march 0.7s linear infinite}
+.note.done .rail{animation:none;background:var(--hl)}
+@keyframes march{to{background-position:0 11px}}
+.sum{cursor:pointer;color:var(--mute);display:flex;gap:10px;align-items:baseline;user-select:none}
+.sum:hover{color:var(--ink)}.sum .q{color:var(--ink)}
+.thread{display:none;margin-top:10px;font:16px/1.65 Charter,Georgia,serif;color:var(--ink)}
+.note.open .thread{display:block}
+.thread .you{color:var(--mute);font:13px ui-monospace,monospace;margin-bottom:6px}
+.thread p{margin:.3em 0 .8em}
+.prop{border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-top:8px}
+.row{display:flex;gap:12px;padding:8px 12px;align-items:flex-start;font-size:16px}
+.row .s{font:700 14px ui-monospace,monospace;width:14px;flex:none;padding-top:2px}
+.row.del{background:#fbeeea;color:#7a3a2e}.row.del .t{text-decoration:line-through}.row.del .s{color:var(--no)}
+.row.add{background:#ecf6ef}.row.add .s{color:var(--ok)}
+.row .t{flex:1}.row .act{display:flex;gap:6px;font:600 14px system-ui,sans-serif}
+.act button{border:1px solid var(--line);background:#fff;border-radius:6px;width:28px;height:26px;cursor:pointer}
+.act .y{color:var(--ok)}.act .n{color:var(--no)}.act button:hover{background:#f3f0e6}
+.prop.resolved .row.del{display:none}.prop.rejected .row.add{display:none}.prop.rejected .row.del{background:none;color:inherit}.prop.rejected .row.del .t{text-decoration:none}
+.prop .act.gone{visibility:hidden}
+.fu{margin-top:10px;color:var(--mute);font:13px ui-monospace,monospace}
+.hint{text-align:center;font:14px system-ui,sans-serif;color:var(--mute);margin:-4px 0 0}
+/* sections */
+section{padding:84px 0 20px}
+h2{font-size:clamp(30px,4.4vw,46px);line-height:1.1;margin:0 0 14px;letter-spacing:-.015em}
+.lead{color:var(--mute);max-width:620px;margin:0 0 40px}
+.cols{display:grid;grid-template-columns:repeat(3,1fr);gap:22px}
+.card{border-top:2px solid var(--ink);padding-top:16px}
+.card h4{margin:0 0 8px;font:700 13px/1 system-ui,sans-serif;letter-spacing:.1em;text-transform:uppercase}
+.card p{margin:0;color:var(--mute);font-size:17px}
+.vs{display:grid;grid-template-columns:1fr 1fr;gap:22px}
+.vs div{padding:26px;border-radius:14px;border:1px solid var(--line);background:#fff}
+.vs div.me{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.vs h4{margin:0 0 10px;font:700 13px/1 system-ui,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:var(--mute)}.vs .me h4{color:var(--hl)}
+.vs p{margin:0;font-size:17px}
+.signs{display:grid;grid-template-columns:repeat(4,1fr);gap:0;border:1px solid var(--line);border-radius:14px;background:#fff;overflow:hidden}
+.signs div{padding:22px;border-right:1px solid var(--line);font-size:15px;color:var(--mute)}.signs div:last-child{border:0}
+.signs b{display:block;font:700 30px ui-monospace,monospace;color:var(--ink);margin-bottom:6px}
+.steps{counter-reset:s;display:grid;gap:14px;padding:0;list-style:none;margin:0}
+.steps li{counter-increment:s;display:flex;gap:18px;align-items:baseline;padding:16px 0;border-bottom:1px solid var(--line)}
+.steps li:before{content:counter(s);font:700 15px ui-monospace,monospace;background:var(--hl);border-radius:50%;width:30px;height:30px;display:grid;place-items:center;flex:none}
+footer{margin:90px 0 0;padding:34px 0 60px;border-top:1px solid var(--line);font:14px system-ui,sans-serif;color:var(--mute);display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px}
+@media(max-width:760px){.cols,.vs{grid-template-columns:1fr}.signs{grid-template-columns:1fr 1fr}.doc{padding:24px 20px 28px 44px}.blk .ask{left:-26px}nav .r{gap:14px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<nav><div class="l"><img src="logo.png" alt=""><span>BlogBuddy</span></div>
+<div class="r"><a href="#how">How it works</a><a href="#editor">Editor</a><a href="https://github.com/SandyKidYao/blogbuddy">GitHub</a></div></nav>
+
+<header class="hero">
+<h1>Write in the document.<br>Talk in the <span class="hl">margin</span>.</h1>
+<p>BlogBuddy is a Markdown editor for VS Code. Leave a sentence beside a paragraph, keep writing, and read your agent's answer when you reach a stopping point.</p>
+<div class="cta">
+<a class="btn p" href="https://marketplace.visualstudio.com/items?itemName=FulcrumStudio.blogbuddy">Install from Marketplace</a>
+<a class="btn" href="https://github.com/SandyKidYao/blogbuddy">View on GitHub</a>
+</div>
+</header>
+
+<div class="stage" id="demo">
+<div class="bar"><i></i><i></i><i></i><b>post.md — BB Editor</b></div>
+<div class="doc">
+<h3>Why margin notes</h3>
+<div class="blk has"><span class="ask">※</span>A chat pane makes the conversation the main thing and your document an attachment. You copy text over, explain the context, wait, and carry the useful part back.</div>
+<div class="note" id="n1">
+<div class="rail"></div>
+<div class="sum" id="s1"><span id="st">⌕ searching…</span></div>
+<div class="thread">
+<div class="you">※ tighten this</div>
+<p>Cut the second sentence's list down to its verbs, and name the cost once.</p>
+<div class="prop" id="prop">
+<div class="row del"><span class="s">−</span><span class="t">A chat pane makes the conversation the main thing and your document an attachment. You copy text over, explain the context, wait, and carry the useful part back.</span></div>
+<div class="row add"><span class="s">+</span><span class="t">A chat pane turns your document into an attachment: copy, explain, wait, carry back.</span>
+<span class="act"><button class="y" title="accept">✓</button><button class="n" title="reject">×</button></span></div>
+</div>
+<div class="fu" id="fu">※ <span style="opacity:.6">follow up…</span></div>
+</div>
+</div>
+<div class="blk"><span class="ask">※</span>BlogBuddy turns that around. The document stays the main thing, and conversations hang off the blocks they are about.</div>
+</div>
+</div>
+<p class="hint">This is a live mock. Click the line under the paragraph, then accept or reject the change.</p>
+
+<section id="how">
+<h2>The document stays the main thing.</h2>
+<p class="lead">Chat tools make you leave the page. BlogBuddy keeps the page and hangs the conversation off it.</p>
+<div class="vs">
+<div><h4>A chat pane</h4><p>Copy the text over. Explain the context. Wait. Carry the useful part back. Lose your place.</p></div>
+<div class="me"><h4>Margin notes</h4><p><kbd style="color:#1c1b18">⌘B</kbd> <kbd style="color:#1c1b18">⌘B</kbd>, one sentence, <kbd style="color:#1c1b18">↵</kbd>. The caret is back where you were. The answer lands quietly under the block.</p></div>
+</div>
+</section>
+
+<section>
+<h2>Quiet by design.</h2>
+<p class="lead">Notes never touch your Markdown file. Changes come back as proposals you accept block by block.</p>
+<div class="cols">
+<div class="card"><h4>Background</h4><p>Marching dashes while the agent works. When it lands, only one line changes. Nothing pops up and the caret never moves.</p></div>
+<div class="card"><h4>Proposals, not edits</h4><p>The agent returns a rewrite; you see the diff per block. Accepting is an ordinary edit, so ⌘Z undoes it.</p></div>
+<div class="card"><h4>Read-only agent</h4><p>It can read your workspace and search the web. It cannot write files or run commands that change anything.</p></div>
+</div>
+</section>
+
+<section>
+<h2>Signs, not words.</h2>
+<p class="lead">The interface speaks in Markdown's own glyphs, so it stays out of your way.</p>
+<div class="signs">
+<div><b>※</b>Ask about a block</div><div><b>~ + −</b>Rewritten, added, removed</div><div><b>✓ ×</b>Accept or reject a block</div><div><b>∎</b>Done, dismiss the note</div>
+</div>
+</section>
+
+<section id="editor">
+<h2>A live-preview editor underneath.</h2>
+<p class="lead">Built on CodeMirror 6. What you edit is the file's own text.</p>
+<div class="cols">
+<div class="card"><h4>Live preview</h4><p>GFM styled as you write; the marks return, faintly, on the line you're editing.</p></div>
+<div class="card"><h4>Frontmatter head</h4><p>Title, date, tags and more edited in place, with raw YAML one click away.</p></div>
+<div class="card"><h4>Zen mode</h4><p>A centered column whose chrome fades while you type.</p></div>
+<div class="card"><h4>Slash menu</h4><p>Block types, written as Markdown.</p></div>
+<div class="card"><h4>IME-safe</h4><p>CJK composition reaches the document only once committed.</p></div>
+<div class="card"><h4>Paste to disk</h4><p>Dropped images are saved beside the document and linked by relative path.</p></div>
+</div>
+</section>
+
+<section>
+<h2>Four steps.</h2>
+<ol class="steps">
+<li>Install BlogBuddy from the VS Code Marketplace.</li>
+<li>Have Claude Code or Codex installed and signed in. No API key to configure.</li>
+<li>Open a <code>.md</code> and press <kbd>⌘⇧B</kbd> to open BB Editor.</li>
+<li>Press <kbd>⌘B ⌘B</kbd> in a paragraph, ask, and keep writing.</li>
+</ol>
+</section>
+
+<footer><span>Built for people who write in Markdown.</span><span><a href="https://github.com/SandyKidYao/blogbuddy">GitHub</a> · <a href="https://github.com/SandyKidYao/blogbuddy/blob/main/docs/help.md">Guide</a> · <a href="https://github.com/SandyKidYao/blogbuddy/blob/main/CHANGELOG.md">Changelog</a> · <a href="https://github.com/SandyKidYao/blogbuddy/blob/main/docs/README_CN.md">中文</a></span></footer>
+</div>
+<script>
+const n=document.getElementById('n1'),st=document.getElementById('st'),prop=document.getElementById('prop');
+const frames=['⌕ searching…','↗ reading a page…','✎ writing…'];let i=0;
+const t=setInterval(()=>{i++;if(i<frames.length){st.textContent=frames[i]}else{clearInterval(t);n.classList.add('done');st.innerHTML='<span class="q">※</span> A chat pane turns your document into an attachment… <span>~1</span>'}},1300);
+document.getElementById('s1').onclick=()=>n.classList.toggle('open');
+function settle(ok){prop.classList.add(ok?'resolved':'rejected');prop.querySelector('.act').classList.add('gone');st.innerHTML='<span class="q">※</span> '+(ok?'accepted — ⌘Z undoes it':'rejected — file untouched')+' <span>∎</span>'}
+prop.querySelector('.y').onclick=()=>settle(true);prop.querySelector('.n').onclick=()=>settle(false);
+</script>
+</body>
+</html>
