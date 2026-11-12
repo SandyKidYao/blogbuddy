@@ -1,5 +1,6 @@
 import type { Extension } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
+import * as l10n from '@vscode/l10n';
 import type { HostMessage, WebviewMessage } from '../../src/services/webviewProtocol';
 
 /**
@@ -42,7 +43,7 @@ async function upload(view: EditorView, host: UploadHost, files: File[], pos: nu
             const dataBase64 = await fileToBase64(file);
             const uploadId = crypto.randomUUID();
             const result = await new Promise<Uploaded>((resolve, reject) => {
-                const timer = setTimeout(() => { pending.delete(uploadId); reject(new Error('上传超时，请重试。')); }, 30000);
+                const timer = setTimeout(() => { pending.delete(uploadId); reject(new Error(l10n.t('Upload timed out. Please try again.'))); }, 30000);
                 pending.set(uploadId, { resolve, reject, timer });
                 host.post({ type: 'file-upload', uploadId, fileName: file.name, mimeType: file.type, dataBase64 });
             });
@@ -56,7 +57,7 @@ async function upload(view: EditorView, host: UploadHost, files: File[], pos: nu
             view.dispatch({ changes: { from: spot.pos, insert }, selection: { anchor: spot.pos + insert.length }, userEvent: 'input.upload' });
         }
     } catch (error) {
-        host.notice(`上传失败：${error instanceof Error ? error.message : '请重试'}`);
+        host.notice(l10n.t('Upload failed: {0}', error instanceof Error ? error.message : l10n.t('please try again')));
     } finally {
         spots.delete(spot);
     }

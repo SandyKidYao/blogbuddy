@@ -1,4 +1,5 @@
 import * as path from 'path';
+import * as l10n from '@vscode/l10n';
 import { AgentService, AgentPreference } from '../services/AgentService';
 import { AGENT_LABEL } from '../services/agentProtocol';
 import type { NoteScopeKind, NoteTurnWire } from '../services/webviewProtocol';
@@ -82,9 +83,9 @@ export function parseNoteReply(raw: string, scopeMarkdown: string): { reply: str
     const replacement = matches.length ? matches[matches.length - 1][1].replace(/\s+$/, '') : undefined;
     const reply = raw.replace(REPLACE, '').trim();
     if (replacement === undefined || replacement.trim() === scopeMarkdown.trim()) {
-        return { reply: reply || '（没有回答）' };
+        return { reply: reply || l10n.t('(No answer)') };
     }
-    return { reply: reply || '改好了，改动标在原文上。', replacement };
+    return { reply: reply || l10n.t('Done. The changes are marked on the text.'), replacement };
 }
 
 /** Answers margin notes by handing them to the writer's own agent. */

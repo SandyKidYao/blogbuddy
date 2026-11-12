@@ -19,6 +19,7 @@
     "onLanguage:markdown"
   ],
   "main": "./dist/extension.js",
+  "l10n": "./l10n",
   "contributes": {
     "customEditors": [
       {
@@ -35,7 +36,7 @@
     "commands": [
       {
         "command": "blogbuddy.openEditor",
-        "title": "BlogBuddy: Open BB Editor",
+        "title": "%command.openEditor%",
         "icon": {
           "light": "images/icon.png",
           "dark": "images/icon.png"
@@ -43,7 +44,7 @@
       },
       {
         "command": "blogbuddy.openSource",
-        "title": "BlogBuddy: Reopen as Markdown Source",
+        "title": "%command.openSource%",
         "icon": "$(code)"
       }
     ],
@@ -88,17 +89,17 @@
           ],
           "default": "auto",
           "enumDescriptions": [
-            "使用已安装的第一个（先 Claude Code，后 Codex）",
-            "Claude Code（claude 命令）",
-            "Codex（codex 命令）"
+            "%config.agent.auto%",
+            "%config.agent.claude%",
+            "%config.agent.codex%"
           ],
-          "description": "旁注由哪个已安装的 Agent 命令行工具回答。",
+          "description": "%config.agent%",
           "order": 1
         },
         "blogbuddy.assetDir": {
           "type": "string",
           "default": "",
-          "description": "上传资源的相对子目录，留空与文档同目录。",
+          "description": "%config.assetDir%",
           "order": 2
         }
       }
@@ -117,7 +118,7 @@
     "check-types": "tsc --noEmit && tsc --noEmit -p tsconfig.webview.json",
     "lint": "eslint src",
     "test": "vscode-test",
-    "test:unit": "npm run compile-tests && mocha --ui tdd out/test/utils/frontmatter.test.js out/test/utils/MarkdownStatsAnalyzer.test.js out/test/services/textSync.test.js out/test/services/agentProtocol.test.js out/test/core/blockDiff.test.js out/test/core/notes.test.js",
+    "test:unit": "npm run compile-tests && mocha --ui tdd out/test/utils/frontmatter.test.js out/test/utils/MarkdownStatsAnalyzer.test.js out/test/services/textSync.test.js out/test/services/agentProtocol.test.js out/test/core/blockDiff.test.js out/test/core/notes.test.js out/test/l10n.test.js",
     "deploy": "vsce publish"
   },
   "devDependencies": {
@@ -127,6 +128,7 @@
     "@types/vscode": "^1.102.0",
     "@typescript-eslint/eslint-plugin": "^8.31.1",
     "@typescript-eslint/parser": "^8.31.1",
+    "@vscode/l10n-dev": "^0.0.35",
     "@vscode/test-cli": "^0.0.11",
     "@vscode/test-electron": "^3.1.0",
     "@vscode/vsce": "^3.9.1",
@@ -160,6 +162,7 @@
     "@lezer/common": "^1.5.5",
     "@lezer/highlight": "^1.2.5",
     "@lezer/markdown": "^1.8.1",
+    "@vscode/l10n": "^0.0.18",
     "js-yaml": "^4.1.1"
   }
 }

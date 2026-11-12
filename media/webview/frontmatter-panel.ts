@@ -6,6 +6,7 @@ import { Annotation, Compartment, EditorState } from '@codemirror/state';
 import { EditorView, keymap } from '@codemirror/view';
 import { classHighlighter } from '@lezer/highlight';
 import yaml from 'js-yaml';
+import * as l10n from '@vscode/l10n';
 
 // Frontmatter is shown as the document's own head: real keys, values edited in
 // place, framed by the file's real fences. Edits rewrite only the edited key's
@@ -215,7 +216,7 @@ function listControl(key: string, value: unknown): HTMLElement {
             remove.type = 'button';
             remove.className = 'fm-item-remove';
             remove.textContent = '×';
-            remove.setAttribute('aria-label', `移除 ${scalarText(item)}`);
+            remove.setAttribute('aria-label', l10n.t('Remove {0}', scalarText(item)));
             remove.addEventListener('click', () => {
                 items = items.filter((_, i) => i !== index);
                 writeField(key, items);
@@ -228,7 +229,7 @@ function listControl(key: string, value: unknown): HTMLElement {
         input.className = 'fm-list-input';
         input.placeholder = '+';
         input.spellcheck = false;
-        input.setAttribute('aria-label', `添加到 ${key}`);
+        input.setAttribute('aria-label', l10n.t('Add to {0}', key));
         input.addEventListener('keydown', (e) => {
             if (e.isComposing) { return; }
             if (e.key === 'Enter' || e.key === ',' || e.key === '，') {
@@ -257,8 +258,9 @@ function complexControl(value: unknown): HTMLElement {
     button.type = 'button';
     button.className = 'fm-complex';
     const count = Array.isArray(value) ? value.length : Object.keys(value as object).length;
-    button.textContent = Array.isArray(value) ? `[ ${count} 项 ]` : `{ ${count} 项 }`;
-    button.title = '嵌套值，在源码中编辑';
+    const items = count === 1 ? l10n.t('1 item') : l10n.t('{0} items', count);
+    button.textContent = Array.isArray(value) ? `[ ${items} ]` : `{ ${items} }`;
+    button.title = l10n.t('Nested value; edit it in the source');
     button.addEventListener('click', () => setSourceMode(true));
     return button;
 }
@@ -297,13 +299,13 @@ function make<K extends keyof HTMLElementTagNameMap>(tag: K, className: string, 
 }
 
 function build(): Parts {
-    const root = make('section', 'fm fm-collapsed', { id: 'frontmatter-panel', 'aria-label': '文档属性' });
+    const root = make('section', 'fm fm-collapsed', { id: 'frontmatter-panel', 'aria-label': l10n.t('Document properties') });
     root.hidden = true;
-    const toggle = make('button', 'fm-toggle', { id: 'frontmatter-toggle', type: 'button', 'aria-expanded': 'false', title: '展开 / 收起属性' });
+    const toggle = make('button', 'fm-toggle', { id: 'frontmatter-toggle', type: 'button', 'aria-expanded': 'false', title: l10n.t('Expand / collapse properties') });
     const fence = make('span', 'fm-fence', { id: 'frontmatter-fence' }, '---');
     const summary = make('span', 'fm-summary', { id: 'frontmatter-summary' });
     toggle.append(fence, summary);
-    const source = make('button', 'fm-source-toggle', { id: 'frontmatter-source', type: 'button', 'aria-pressed': 'false', title: '编辑源码' }, '{ }');
+    const source = make('button', 'fm-source-toggle', { id: 'frontmatter-source', type: 'button', 'aria-pressed': 'false', title: l10n.t('Edit source') }, '{ }');
     const head = make('div', 'fm-head');
     head.append(toggle, source);
     const props = make('dl', 'fm-props', { id: 'frontmatter-props' });
@@ -319,7 +321,7 @@ function build(): Parts {
                 EditorView.lineWrapping,
                 // Tab indents here; Esc then Tab leaves the editor (CodeMirror's convention).
                 keymap.of([indentWithTab, ...historyKeymap, ...defaultKeymap]),
-                EditorView.contentAttributes.of({ 'aria-label': '属性源码', spellcheck: 'false' }),
+                EditorView.contentAttributes.of({ 'aria-label': l10n.t('Properties source'), spellcheck: 'false' }),
                 EditorView.updateListener.of(update => {
                     if (update.docChanged && !update.transactions.some(tr => tr.annotation(fromDocument))) {
                         sourceEdited(update.state.doc.toString());
@@ -366,10 +368,12 @@ function renderProps(): void {
     if (!data) {
         const error = document.createElement('div');
         error.className = 'fm-error';
-        error.textContent = fenced?.fence === '+++' ? 'TOML 属性只能在源码中编辑。' : 'YAML 有语法错误，属性暂时无法显示。';
+        error.textContent = fenced?.fence === '+++'
+            ? l10n.t('TOML properties can only be edited in the source.')
+            : l10n.t("The YAML has a syntax error, so the properties can't be shown.");
         const fix = document.createElement('button');
         fix.type = 'button';
-        fix.textContent = '打开源码';
+        fix.textContent = l10n.t('Show source');
         fix.addEventListener('click', () => setSourceMode(true));
         error.append(' ', fix);
         props.append(error);
@@ -393,11 +397,11 @@ function addFieldRow(): HTMLElement {
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'fm-add-button';
-    button.textContent = '+ 添加属性';
+    button.textContent = l10n.t('+ Add property');
     button.addEventListener('click', () => {
         const input = document.createElement('input');
         input.className = 'fm-add-input';
-        input.placeholder = '属性名';
+        input.placeholder = l10n.t('Property name');
         input.spellcheck = false;
         input.setAttribute('list', 'frontmatter-key-suggestions');
         const suggestions = document.createElement('datalist');
@@ -445,7 +449,7 @@ function renderSummary(): void {
         summary.append(span);
     };
     if (!data) {
-        add(fenced?.fence === '+++' ? 'TOML' : 'YAML 有语法错误', 'fm-dim');
+        add(fenced?.fence === '+++' ? 'TOML' : l10n.t('YAML syntax error'), 'fm-dim');
         return;
     }
     if (data.draft === true) { add('draft', 'fm-flag'); }
@@ -454,7 +458,7 @@ function renderSummary(): void {
     tags.slice(0, 4).forEach(tag => add(`#${tag}`, 'fm-tag'));
     if (tags.length > 4) { add(`+${tags.length - 4}`, 'fm-dim'); }
     if (!summary.childElementCount) {
-        add(Object.keys(data).join('  ') || '空', 'fm-dim');
+        add(Object.keys(data).join('  ') || l10n.t('Empty'), 'fm-dim');
     }
 }
 

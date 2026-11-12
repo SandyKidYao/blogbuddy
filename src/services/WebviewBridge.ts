@@ -63,7 +63,7 @@ export class WebviewBridge implements vscode.Disposable {
         this.sync = new SyncLog(textOf(document.getText()));
         this.disposables.push(
             webview.onDidReceiveMessage((msg: WebviewMessage) => this.handleMessage(msg).catch(error => {
-                this.post({ type: 'notice', message: error instanceof Error ? error.message : '操作失败，请重试。' });
+                this.post({ type: 'notice', message: error instanceof Error ? error.message : vscode.l10n.t('Something went wrong. Please try again.') });
             })),
             vscode.workspace.onDidChangeTextDocument(event => {
                 if (event.document === this.document) { this.onDocumentChange(event.contentChanges); }
@@ -204,7 +204,7 @@ export class WebviewBridge implements vscode.Disposable {
         const id = msg.requestId;
         if (typeof id !== 'string' || typeof msg.question !== 'string' || typeof msg.scopeMarkdown !== 'string'
             || !Array.isArray(msg.history) || !this.options.askNote) {
-            this.post({ type: 'note-error', requestId: id, message: '这条旁注没有发出去，请重试。' });
+            this.post({ type: 'note-error', requestId: id, message: vscode.l10n.t("This note wasn't sent. Please try again.") });
             return;
         }
         const run = new AbortController();
@@ -218,7 +218,7 @@ export class WebviewBridge implements vscode.Disposable {
             if (!run.signal.aborted) { this.post({ type: 'note-done', requestId: id, ...answer }); }
         } catch (error) {
             if (!run.signal.aborted) {
-                this.post({ type: 'note-error', requestId: id, message: error instanceof Error ? error.message : '没有得到回答，请重试。' });
+                this.post({ type: 'note-error', requestId: id, message: error instanceof Error ? error.message : vscode.l10n.t('No answer came back. Please try again.') });
             }
         } finally {
             this.noteRuns.delete(id);
@@ -231,14 +231,14 @@ export class WebviewBridge implements vscode.Disposable {
 
         // Only allow relative paths (resolved from document directory)
         if (path.isAbsolute(assetDir)) {
-            vscode.window.showWarningMessage('assetDir must be a relative path. Saving to document directory.');
+            vscode.window.showWarningMessage(vscode.l10n.t('blogbuddy.assetDir must be a relative path. Saving next to the document instead.'));
             return docDir;
         }
         const resolved = path.resolve(docDir, assetDir);
         // Ensure resolved path is within docDir (prevent ../ escaping)
         const relative = path.relative(docDir, resolved);
         if (relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
-            vscode.window.showWarningMessage('assetDir must be within the document directory. Saving to document directory.');
+            vscode.window.showWarningMessage(vscode.l10n.t("blogbuddy.assetDir must stay inside the document's folder. Saving next to the document instead."));
             return docDir;
         }
         await fs.mkdir(resolved, { recursive: true });
@@ -248,7 +248,7 @@ export class WebviewBridge implements vscode.Disposable {
     private async handleFileUpload(msg: WebviewFileUploadMessage): Promise<void> {
         const filePath = this.filePath;
         if (!filePath) {
-            this.post({ type: 'file-upload-error', uploadId: msg.uploadId, message: '先保存文档，再插入文件。' });
+            this.post({ type: 'file-upload-error', uploadId: msg.uploadId, message: vscode.l10n.t('Save the document before inserting files.') });
             return;
         }
         try {
@@ -265,7 +265,7 @@ export class WebviewBridge implements vscode.Disposable {
                 fileName: finalName,
             });
         } catch (error) {
-            this.post({ type: 'file-upload-error', uploadId: msg.uploadId, message: error instanceof Error ? error.message : 'Upload failed' });
+            this.post({ type: 'file-upload-error', uploadId: msg.uploadId, message: error instanceof Error ? error.message : vscode.l10n.t('Please try again.') });
         }
     }
 

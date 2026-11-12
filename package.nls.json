@@ -1,0 +1,9 @@
+{
+  "command.openEditor": "BlogBuddy: Open BB Editor",
+  "command.openSource": "BlogBuddy: Reopen as Markdown Source",
+  "config.agent": "Which installed agent CLI answers margin notes.",
+  "config.agent.auto": "The first one installed (Claude Code, then Codex)",
+  "config.agent.claude": "Claude Code (the claude command)",
+  "config.agent.codex": "Codex (the codex command)",
+  "config.assetDir": "Subfolder for uploaded files, relative to the document. Leave empty to use the document's folder."
+}

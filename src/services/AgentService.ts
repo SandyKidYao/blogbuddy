@@ -2,6 +2,7 @@ import { spawn, execFile } from 'child_process';
 import * as fs from 'fs/promises';
 import * as os from 'os';
 import * as path from 'path';
+import * as l10n from '@vscode/l10n';
 import { AgentKind, AGENT_LABEL, agentArgs, parseAgentLine } from './agentProtocol';
 
 export type AgentPreference = 'auto' | AgentKind;
@@ -45,11 +46,12 @@ export class AgentService {
         run.onStep(kind);
 
         return new Promise<AgentOutput>((resolve, reject) => {
-            if (run.signal.aborted) { reject(new AgentError('已取消')); return; }
+            if (run.signal.aborted) { reject(new AgentError(l10n.t('Cancelled'))); return; }
             const child = spawn(binary, agentArgs(kind, run.cwd), {
                 cwd: run.cwd, env, stdio: ['pipe', 'pipe', 'pipe'], shell: process.platform === 'win32',
             });
-            let final = '', error = '', stderr = '', buffer = '', settled = false;
+            let final = '', stderr = '', buffer = '', settled = false;
+            let error: string | undefined;
 
             const finish = (action: () => void): void => {
                 if (settled) { return; }
@@ -58,10 +60,10 @@ export class AgentService {
                 run.signal.removeEventListener('abort', onAbort);
                 action();
             };
-            const onAbort = (): void => { child.kill(); finish(() => reject(new AgentError('已取消'))); };
+            const onAbort = (): void => { child.kill(); finish(() => reject(new AgentError(l10n.t('Cancelled')))); };
             const timer = setTimeout(() => {
                 child.kill();
-                finish(() => reject(new AgentError(`${AGENT_LABEL[kind]} 超过 15 分钟没有完成，已停止。`)));
+                finish(() => reject(new AgentError(l10n.t("{0} didn't finish within 15 minutes and was stopped.", AGENT_LABEL[kind]))));
             }, RUN_TIMEOUT_MS);
             run.signal.addEventListener('abort', onAbort);
 
@@ -69,7 +71,7 @@ export class AgentService {
                 const event = parseAgentLine(kind, line);
                 if (event.step) { run.onStep(event.step); }
                 if (event.final !== undefined) { final = event.final; }
-                if (event.error) { error = event.error; }
+                if (event.error !== undefined) { error = event.error; }
             };
             child.stdout.setEncoding('utf8');
             child.stdout.on('data', (chunk: string) => {
@@ -81,14 +83,22 @@ export class AgentService {
             child.stderr.setEncoding('utf8');
             child.stderr.on('data', (chunk: string) => { stderr = (stderr + chunk).slice(-2000); });
 
-            child.on('error', cause => finish(() => reject(new AgentError(`无法启动 ${AGENT_LABEL[kind]}：${cause.message}`))));
+            child.on('error', cause => finish(() => reject(new AgentError(l10n.t("Couldn't start {0}: {1}", AGENT_LABEL[kind], cause.message)))));
             child.on('close', code => finish(() => {
                 if (buffer) { readLine(buffer); }
-                if (error) { reject(new AgentError(error)); }
+                if (error !== undefined) {
+                    // Our sentence in the interface language, then the agent's own words as they are.
+                    const reason = l10n.t('{0} reported an error', AGENT_LABEL[kind]);
+                    reject(new AgentError(error ? l10n.t('{0}: {1}', reason, error) : reason));
+                }
                 else if (final.trim()) { resolve({ text: final, agent: kind }); }
                 else {
                     const detail = stderr.trim().split('\n').slice(-3).join(' ').trim();
-                    reject(new AgentError(`${AGENT_LABEL[kind]} 没有给出回答${code ? `（退出码 ${code}）` : ''}${detail ? `：${detail}` : '。'}`));
+                    const reason = code
+                        ? l10n.t('{0} gave no answer (exit code {1})', AGENT_LABEL[kind], code)
+                        : l10n.t('{0} gave no answer', AGENT_LABEL[kind]);
+                    // The agent's own output is passed through as it is, untranslated.
+                    reject(new AgentError(detail ? l10n.t('{0}: {1}', reason, detail) : reason));
                 }
             }));
 
@@ -105,8 +115,8 @@ export class AgentService {
             if (binary) { return { kind, binary }; }
         }
         throw new AgentError(preference === 'auto'
-            ? '没有找到 claude 或 codex 命令。旁注借用你已安装的 Agent：请先安装并登录 Claude Code 或 Codex。'
-            : `没有找到 ${preference} 命令。请确认 ${AGENT_LABEL[preference]} 已安装并登录，或把设置 blogbuddy.agent 改为 auto。`);
+            ? l10n.t('No claude or codex command found. Margin notes use the agent you already have: install and sign in to Claude Code or Codex.')
+            : l10n.t('No {0} command found. Make sure {1} is installed and signed in, or set blogbuddy.agent to auto.', preference, AGENT_LABEL[preference]));
     }
 
     private findBinary(kind: AgentKind): Promise<string | undefined> {

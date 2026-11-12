@@ -1,3 +1,4 @@
+import * as l10n from '@vscode/l10n';
 import { lastProposalTurn, lensOn, type AiTurn, type Mark, type Note, type NoteActions, type Scope } from './notes-model';
 
 /**
@@ -39,9 +40,18 @@ function lineHeightOf(target: Element): number {
     return parseFloat(getComputedStyle(target).lineHeight) || 26;
 }
 
-const SIGN_TITLE: Record<string, string> = {
-    '~': '改写', '+': '新增', '−': '删除', '⤷': '从别处移到这里', '↑': '这个块移到了上方', '↓': '这个块移到了下方',
-};
+/** What a change sign in the gutter means, for its tooltip. */
+function signTitle(sign: string): string {
+    switch (sign) {
+        case '~': return l10n.t('Rewritten');
+        case '+': return l10n.t('Added');
+        case '−': return l10n.t('Removed');
+        case '⤷': return l10n.t('Moved here from elsewhere');
+        case '↑': return l10n.t('This block moved up');
+        case '↓': return l10n.t('This block moved down');
+        default: return '';
+    }
+}
 
 function h<K extends keyof HTMLElementTagNameMap>(tag: K, className = '', text = ''): HTMLElementTagNameMap[K] {
     const element = document.createElement(tag);
@@ -86,7 +96,7 @@ export class NotesView {
         this.layer.setAttribute('aria-hidden', 'false');
         this.container.append(this.layer);
 
-        this.ghost = button('bb-ghost', '※', '对这个块问一句（⌘B ⌘B）', () => {
+        this.ghost = button('bb-ghost', '※', l10n.t('Ask about this block (⌘B ⌘B)'), () => {
             const scope = this.hoverPos === null ? null : this.actions.scopeForBlock(this.hoverPos);
             if (scope) { this.openAsk(scope); }
         });
@@ -94,7 +104,7 @@ export class NotesView {
         this.ghost.hidden = true;
 
         this.askInput.autocomplete = 'off';
-        this.askInput.setAttribute('aria-label', '对这个块问一句');
+        this.askInput.setAttribute('aria-label', l10n.t('Ask about this block'));
         this.askBox.append(h('span', 'bb-ask-glyph', '※'), this.askInput, this.askScope, h('span', 'bb-ask-key', '↵'));
         this.askBox.hidden = true;
         this.askRail.hidden = true;
@@ -183,7 +193,7 @@ export class NotesView {
 
     /** Expanded: the whole thread, the proposal's decisions, and a place to follow up. */
     private card(note: Note): HTMLElement[] {
-        const parts: HTMLElement[] = [button('bb-note-x', '⌃', '收起', () => this.actions.toggle(note, false))];
+        const parts: HTMLElement[] = [button('bb-note-x', '⌃', l10n.t('Collapse'), () => this.actions.toggle(note, false))];
         const proposalTurn = lastProposalTurn(note);
         note.thread.forEach((turn, index) => {
             if (turn.role === 'me') {
@@ -191,7 +201,7 @@ export class NotesView {
                 question.append(h('span', 'bb-note-g', '※'), h('span', '', turn.text));
                 if (index === 0 && note.tag) { question.append(h('span', 'bb-note-scope', note.tag)); }
                 parts.push(question);
-                if (index === 0 && note.quote) { parts.push(h('div', 'bb-note-quote', `「${note.quote}」`)); }
+                if (index === 0 && note.quote) { parts.push(h('div', 'bb-note-quote', l10n.t('“{0}”', note.quote))); }
                 return;
             }
             const answer = h('div', 'bb-note-a');
@@ -202,21 +212,21 @@ export class NotesView {
         if (note.status === 'working') {
             const working = h('div', 'bb-note-w');
             working.append(h('i', 'bb-ring'), h('span', 'bb-note-step', note.step), h('span', 'bb-note-t'),
-                ops(button('bb-btn', '×', '取消这次提问', () => this.actions.cancel(note))));
+                ops(button('bb-btn', '×', l10n.t('Cancel this question'), () => this.actions.cancel(note))));
             parts.push(working);
             return parts;
         }
         if (note.status === 'error') {
             const failed = h('div', 'bb-note-e');
             const reason = h('span', '', note.error);
-            if (note.error === '…') { reason.title = '编辑器关闭时这句话还没有得到回答'; }
-            failed.append(reason, ops(button('bb-btn', '↻', '重试', () => this.actions.retry(note))));
+            if (note.error === '…') { reason.title = l10n.t('The editor closed before this was answered'); }
+            failed.append(reason, ops(button('bb-btn', '↻', l10n.t('Retry'), () => this.actions.retry(note))));
             parts.push(failed);
         }
         const footer = h('div', 'bb-note-f');
         const followUp = h('input', 'bb-note-fu');
         followUp.autocomplete = 'off';
-        followUp.setAttribute('aria-label', '追问');
+        followUp.setAttribute('aria-label', l10n.t('Follow up'));
         followUp.addEventListener('keydown', event => {
             if (composing(event)) { return; }
             if (event.key === 'Enter' && followUp.value.trim()) { event.preventDefault(); this.actions.followUp(note, followUp.value.trim()); }
@@ -226,8 +236,8 @@ export class NotesView {
         // A new line that starts with ※, like every question above it: type here to follow up.
         footer.append(h('span', 'bb-note-g', '※'), followUp);
         if (answered) { footer.append(h('span', 'bb-note-meta', `${answered.agent} · ${answered.seconds}s`)); }
-        const resolve = button('bb-btn bb-note-resolve', '', '了结这条旁注，从文档旁移除', () => this.actions.resolve(note));
-        resolve.setAttribute('aria-label', '了结这条旁注');
+        const resolve = button('bb-btn bb-note-resolve', '', l10n.t('Resolve this note and remove it from the margin'), () => this.actions.resolve(note));
+        resolve.setAttribute('aria-label', l10n.t('Resolve this note'));
         resolve.append(trashIcon());
         footer.append(resolve);
         parts.push(footer);
@@ -244,28 +254,30 @@ export class NotesView {
             const stat = summary.chars && !multi
                 ? chips([['−', summary.chars.del, 'del'], ['+', summary.chars.ins, 'add']])
                 : tallyChips(summary.kinds);
-            stat.title = summary.chars && !multi ? '删去和新增的字数' : '待处理的改动：~ 改写 · + 新增 · − 删除 · ⤷ 移动';
+            stat.title = summary.chars && !multi
+                ? l10n.t('Characters removed and added')
+                : l10n.t('Pending changes: ~ rewritten · + added · − removed · ⤷ moved');
             bar.append(stat);
         }
         if (summary.accepted || summary.rejected) {
             const done = h('span', 'bb-note-stat', [summary.accepted ? `✓${summary.accepted}` : '', summary.rejected ? `×${summary.rejected}` : ''].filter(Boolean).join(' '));
-            done.title = '已接受 / 已放弃的改动数';
+            done.title = l10n.t('Accepted / rejected changes');
             bar.append(done);
         }
         if (summary.stale) {
             const stale = h('span', 'bb-note-stat bb-note-stale', `≠${summary.stale}`);
-            stale.title = '这些改动针对的块在提问后被你改过，已失效';
+            stale.title = l10n.t('You edited these blocks after asking; these changes no longer apply');
             bar.append(stale);
         }
         if (summary.pending.length && !note.lens) {
-            bar.append(ops(button('bb-btn', '±', '把改动标在原文上', () => this.actions.showChanges(note))));
+            bar.append(ops(button('bb-btn', '±', l10n.t('Mark the changes on the text'), () => this.actions.showChanges(note))));
         } else if (summary.pending.length) {
             bar.append(ops(
-                button('bb-btn is-yes', '✓', `${multi ? '全部接受' : '接受'}（可用 ⌘Z 撤销）`, () => this.actions.accept(note)),
-                button('bb-btn', '×', multi ? '全部放弃' : '放弃', () => this.actions.reject(note)),
+                button('bb-btn is-yes', '✓', multi ? l10n.t('Accept all (⌘Z to undo)') : l10n.t('Accept (⌘Z to undo)'), () => this.actions.accept(note)),
+                button('bb-btn', '×', multi ? l10n.t('Reject all') : l10n.t('Reject'), () => this.actions.reject(note)),
             ));
         } else if (summary.rejected) {
-            bar.append(ops(button('bb-btn', '↺', '重新显示放弃的改动', () => this.actions.review(note))));
+            bar.append(ops(button('bb-btn', '↺', l10n.t('Show rejected changes again'), () => this.actions.review(note))));
         }
         return bar;
     }
@@ -296,7 +308,10 @@ export class NotesView {
         this.inbox.replaceChildren();
         if (working) { this.inbox.append(h('i', 'bb-ring')); }
         if (unread) { this.inbox.append(h('i', 'bb-dot'), h('b', '', String(unread))); }
-        this.inbox.title = [working ? `${working} 条旁注处理中` : '', unread ? `${unread} 条未读，点击跳到下一条` : ''].filter(Boolean).join(' · ');
+        this.inbox.title = [
+            working === 1 ? l10n.t('1 note in progress') : working ? l10n.t('{0} notes in progress', working) : '',
+            unread ? l10n.t('{0} unread, click to go to the next', unread) : '',
+        ].filter(Boolean).join(' · ');
     }
 
     // ---- Asking ----
@@ -388,7 +403,10 @@ export class NotesView {
             place(rail, lens ? card.top - 2 : first.top, lens ? card.bottom + 2 : Math.max(last.bottom, card ? card.bottom + 2 : 0));
             rail.className = `bb-rail is-${note.status}${note.unread ? ' is-unread' : ''}${note.open ? ' is-open' : ''}`;
             const question = note.thread.find(turn => turn.role === 'me');
-            rail.title = (question?.role === 'me' ? question.text : '') + (note.status === 'working' ? '（处理中）' : note.unread ? '（未读）' : '');
+            const asked = question?.role === 'me' ? question.text : '';
+            rail.title = note.status === 'working' ? l10n.t('{0} (in progress)', asked).trim()
+                : note.unread ? l10n.t('{0} (unread)', asked).trim()
+                : asked;
         }
         for (const [id, rail] of this.rails) { if (!live.has(id)) { rail.remove(); this.rails.delete(id); } }
 
@@ -403,7 +421,7 @@ export class NotesView {
                 els = {};
                 if (mark.sign) {
                     els.sign = h('span', `bb-sign is-${mark.tone}`, mark.sign);
-                    els.sign.title = SIGN_TITLE[mark.sign] ?? '';
+                    els.sign.title = signTitle(mark.sign);
                     els.bar = h('span', `bb-bar is-${mark.tone}`);
                     this.layer.append(els.bar, els.sign);
                 }
@@ -411,8 +429,8 @@ export class NotesView {
                     const item = mark.item;
                     els.controls = h('span', 'bb-ops');
                     els.controls.append(
-                        button('bb-btn is-yes', '✓', '接受这一处', () => this.actions.accept(mark.note, item)),
-                        button('bb-btn', '×', '放弃这一处', () => this.actions.reject(mark.note, item)),
+                        button('bb-btn is-yes', '✓', l10n.t('Accept this change'), () => this.actions.accept(mark.note, item)),
+                        button('bb-btn', '×', l10n.t('Reject this change'), () => this.actions.reject(mark.note, item)),
                     );
                     this.layer.append(els.controls);
                 }

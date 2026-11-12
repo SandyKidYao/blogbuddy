@@ -1,3 +1,5 @@
+import './l10n';   // first: translations must be in place before anything is drawn
+import * as l10n from '@vscode/l10n';
 import { defaultKeymap, history, historyKeymap, undo } from '@codemirror/commands';
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
 import { indentUnit, syntaxHighlighting } from '@codemirror/language';
@@ -48,11 +50,14 @@ function reportSelection(): void {
 
 // ---- Editor ----
 
-const PHRASES = {
-    'Find': '查找', 'Replace': '替换', 'next': '下一个', 'previous': '上一个', 'all': '全部',
-    'match case': '区分大小写', 'regexp': '正则', 'by word': '全词', 'replace': '替换', 'replace all': '全部替换', 'close': '关闭',
-    'current match': '当前匹配', 'on line': '行',
-};
+/** The search panel's words; CodeMirror's own English is the key. */
+function searchPhrases(): Record<string, string> {
+    return {
+        'Find': l10n.t('Find'), 'Replace': l10n.t('Replace'), 'next': l10n.t('next'), 'previous': l10n.t('previous'), 'all': l10n.t('all'),
+        'match case': l10n.t('match case'), 'regexp': l10n.t('regexp'), 'by word': l10n.t('by word'), 'replace': l10n.t('replace'),
+        'replace all': l10n.t('replace all'), 'close': l10n.t('close'), 'current match': l10n.t('current match'), 'on line': l10n.t('on line'),
+    };
+}
 
 function onUpdate(update: ViewUpdate): void {
     if (update.selectionSet || update.docChanged) { reportSelection(); }
@@ -78,10 +83,10 @@ function createState(doc: string, version: number, editable: boolean): EditorSta
             search({ top: true }),
             slashMenu(),
             dropCursor(),
-            placeholder('开始写作，输入 / 调出 BB 命令'),
+            placeholder(l10n.t('Start writing, or type / for BB commands')),
             EditorView.lineWrapping,
             indentUnit.of('  '),
-            EditorState.phrases.of(PHRASES),
+            EditorState.phrases.of(searchPhrases()),
             sourceLineNumbers(),
             EditorView.editable.of(editable),
             arrowLigatures,
@@ -149,7 +154,9 @@ window.addEventListener('message', (event: MessageEvent<HostMessage>) => {
 function showLayoutMode(): void {
     const btn = document.getElementById('mode-toggle');
     if (!btn) { return; }
-    btn.title = document.body.classList.contains('bb-mode-editor') ? '当前 Editor Mode，点击切换到 Zen Mode' : '当前 Zen Mode，点击切换到 Editor Mode';
+    btn.title = document.body.classList.contains('bb-mode-editor')
+        ? l10n.t('Editor Mode — click to switch to Zen Mode')
+        : l10n.t('Zen Mode — click to switch to Editor Mode');
 }
 document.getElementById('mode-toggle')?.addEventListener('click', () => post({ type: 'toggle-layout-mode' }));
 

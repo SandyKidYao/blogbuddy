@@ -14,7 +14,7 @@ export interface AgentEvent {
     step?: string;
     /** The agent's final answer. */
     final?: string;
-    /** The run failed; this is why. */
+    /** The run failed; the agent's own words about why, untranslated ('' when it gave none). */
     error?: string;
 }
 
@@ -68,7 +68,7 @@ function claudeEvent(event: Json): AgentEvent {
     }
     if (event.type === 'result') {
         const result = text(event.result);
-        if (event.is_error || event.subtype !== 'success') { return { error: result || `Claude Code 没有完成（${text(event.subtype) || '未知原因'}）` }; }
+        if (event.is_error || event.subtype !== 'success') { return { error: result || text(event.subtype) }; }
         return { final: result };
     }
     return {};
@@ -83,9 +83,9 @@ function shellCommand(command: string): string {
 function codexEvent(event: Json): AgentEvent {
     const item = isObject(event.item) ? event.item : undefined;
     if (event.type === 'thread.started') { return { step: '…' }; }
-    if (event.type === 'error') { return { error: text(event.message) || 'Codex 报告了一个错误' }; }
+    if (event.type === 'error') { return { error: text(event.message) }; }
     if (event.type === 'turn.failed') {
-        return { error: (isObject(event.error) && text(event.error.message)) || 'Codex 没有完成这次请求' };
+        return { error: (isObject(event.error) && text(event.error.message)) || '' };
     }
     if (!item) { return {}; }
     if (item.type === 'agent_message' && event.type === 'item.completed') { return { step: '✎', final: text(item.text) }; }

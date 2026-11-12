@@ -1,0 +1,9 @@
+{
+  "command.openEditor": "BlogBuddy：用 BB Editor 打开",
+  "command.openSource": "BlogBuddy：以 Markdown 源码重新打开",
+  "config.agent": "旁注由哪个已安装的 Agent 命令行工具回答。",
+  "config.agent.auto": "使用已安装的第一个（先 Claude Code，后 Codex）",
+  "config.agent.claude": "Claude Code（claude 命令）",
+  "config.agent.codex": "Codex（codex 命令）",
+  "config.assetDir": "上传资源的相对子目录，留空与文档同目录。"
+}

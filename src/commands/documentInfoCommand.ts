@@ -78,8 +78,11 @@ class DocumentInfoStatusBar implements vscode.Disposable {
 
     /** Same label and tooltip for the BB Editor and the plain text editor. */
     private show(stats: EditorDocumentStats): void {
-        this.statusBarItem.text = `$(edit) ${stats.words} 字${stats.selectedWords ? ` · 已选 ${stats.selectedWords}` : ''}`;
-        this.statusBarItem.tooltip = `${stats.characters} 字符 · ${stats.lines} 行`;
+        const words = stats.words === 1 ? vscode.l10n.t('1 word') : vscode.l10n.t('{0} words', stats.words);
+        const characters = stats.characters === 1 ? vscode.l10n.t('1 character') : vscode.l10n.t('{0} characters', stats.characters);
+        const lines = stats.lines === 1 ? vscode.l10n.t('1 line') : vscode.l10n.t('{0} lines', stats.lines);
+        this.statusBarItem.text = `$(edit) ${stats.selectedWords ? vscode.l10n.t('{0} · {1} selected', words, stats.selectedWords) : words}`;
+        this.statusBarItem.tooltip = `${characters} · ${lines}`;
         this.statusBarItem.show();
     }
 

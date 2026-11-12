@@ -167,8 +167,10 @@ class BBEditorProvider implements vscode.CustomTextEditorProvider {
         const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, 'dist', 'webview.js'));
         const styleUri = webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, 'dist', 'webview.css'));
         const nonce = getNonce();
+        // The webview reads its translations from this inert JSON before drawing anything.
+        const strings = JSON.stringify(vscode.l10n.bundle ?? {}).replace(/</g, '\\u003c');
         return `<!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="${vscode.env.language}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -182,16 +184,22 @@ class BBEditorProvider implements vscode.CustomTextEditorProvider {
     <title>BB Editor</title>
 </head>
 <body class="bb-mode-${this.layoutMode()}">
-    <button id="mode-toggle" class="bb-mode-toggle" type="button" aria-label="切换 Zen Mode / Editor Mode">
+    <button id="mode-toggle" class="bb-mode-toggle" type="button" aria-label="${attribute(vscode.l10n.t('Switch between Zen Mode and Editor Mode'))}">
         <span class="bb-mode-toggle__label bb-mode-toggle__label-zen">Z</span>
         <span class="bb-mode-toggle__label bb-mode-toggle__label-editor">E</span>
     </button>
     <div id="editor-layout"><div id="editor"></div></div>
     <div id="status" class="bb-notice" role="status" aria-live="polite" hidden></div>
+    <script id="bb-l10n" type="application/json">${strings}</script>
     <script id="editor-script" nonce="${nonce}" src="${scriptUri}"></script>
 </body>
 </html>`;
     }
+}
+
+/** Text safe inside a double-quoted HTML attribute. */
+function attribute(text: string): string {
+    return text.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
 }
 
 function getNonce(): string {

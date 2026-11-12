@@ -1,6 +1,7 @@
 import { collab, getSyncedVersion, receiveUpdates, sendableUpdates } from '@codemirror/collab';
 import { ChangeSet, type Extension, Transaction } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
+import * as l10n from '@vscode/l10n';
 import type { HostMessage, WebviewMessage } from '../../src/services/webviewProtocol';
 
 /**
@@ -84,7 +85,7 @@ export class DocumentSync {
             // The document moved on first: the updates it went through are on their way,
             // and our edits will be rebased over them. Try again shortly.
             this.refused++;
-            if (this.refused === PATIENCE) { this.notice('文档暂时无法写入（只读或被占用），稍后会继续重试。'); }
+            if (this.refused === PATIENCE) { this.notice(l10n.t("The document can't be written right now (read-only or in use). Will keep retrying.")); }
             this.retry = setTimeout(() => { this.retry = undefined; this.push(); }, this.refused < PATIENCE ? 20 : 2000);
             return;
         }

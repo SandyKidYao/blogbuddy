@@ -2,6 +2,7 @@ import { syntaxTree } from '@codemirror/language';
 import { type EditorState, type Extension, type Range, StateEffect, StateField } from '@codemirror/state';
 import { Decoration, type DecorationSet, EditorView, ViewPlugin, type ViewUpdate, WidgetType } from '@codemirror/view';
 import type { SyntaxNode } from '@lezer/common';
+import * as l10n from '@vscode/l10n';
 import { renderMarkdown, unbracket } from './md-render';
 
 /**
@@ -52,7 +53,7 @@ class Checkbox extends WidgetType {
         box.type = 'checkbox';
         box.checked = this.checked;
         box.tabIndex = -1;
-        box.setAttribute('aria-label', this.checked ? '已完成' : '未完成');
+        box.setAttribute('aria-label', this.checked ? l10n.t('Done') : l10n.t('Not done'));
         // Ticking edits the [ ] / [x] in the source; the caret stays where it was.
         box.addEventListener('mousedown', event => {
             event.preventDefault();
