@@ -4,13 +4,11 @@ All notable changes to the "blogbuddy" extension will be documented in this file
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
-## [Unreleased]
+## [0.2.0] - 2026-11-12
 
 ### Added
 
 - **English and Chinese interface.** BlogBuddy follows VS Code's display language: Simplified Chinese shows Chinese, every other language shows English. This covers commands, settings, margin notes (tooltips, errors), the properties panel, the slash menu, the find bar and the status bar. The slash menu also matches English keywords in either language (`/h1`, `/table`). Answers from the agent stay in the language you write in, as before.
-
-## [0.2.0] - 2026-11-12
 
 ### Changed
 

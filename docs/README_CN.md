@@ -7,7 +7,7 @@
 **VS Code 里的 Markdown 编辑器，你的 Agent 在页边干活。**
 在一段文字旁留一句话，接着写，忙完了再看回答。
 
-[![Version](https://img.shields.io/badge/version-0.1.0-FFD900.svg)](https://github.com/FulcrumStd/blogbuddy)
+[![Version](https://img.shields.io/badge/version-0.2.0-FFD900.svg)](https://github.com/SandyKidYao/blogbuddy)
 [![VS Code](https://img.shields.io/badge/VS%20Code-Extension-007ACC.svg)](https://marketplace.visualstudio.com/items?itemName=FulcrumStudio.blogbuddy)
 
 [English README](../README.md) · [完整指南](help_CN.md) · [更新日志](../CHANGELOG.md)
@@ -162,7 +162,7 @@ BlogBuddy 会在 VS Code 的 `PATH`、登录 shell 的 `PATH` 和常见安装位
 
 ## 反馈
 
-Bug 或功能建议 → [提交 issue](https://github.com/FulcrumStd/blogbuddy/issues)。
+Bug 或功能建议 → [提交 issue](https://github.com/SandyKidYao/blogbuddy/issues)。
 
 ---
 

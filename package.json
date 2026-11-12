@@ -6,7 +6,7 @@
   "icon": "images/icon.png",
   "publisher": "FulcrumStudio",
   "repository": {
-    "url": "https://github.com/FulcrumStd/blogbuddy.git",
+    "url": "https://github.com/SandyKidYao/blogbuddy.git",
     "type": "git"
   },
   "engines": {

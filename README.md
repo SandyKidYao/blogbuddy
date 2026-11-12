@@ -7,7 +7,7 @@
 **A Markdown editor for VS Code where your agent works in the margin.**
 Leave a sentence beside a paragraph. Keep writing. Read the answer when you're ready.
 
-[![Version](https://img.shields.io/badge/version-0.1.0-FFD900.svg)](https://github.com/FulcrumStd/blogbuddy)
+[![Version](https://img.shields.io/badge/version-0.2.0-FFD900.svg)](https://github.com/SandyKidYao/blogbuddy)
 [![VS Code](https://img.shields.io/badge/VS%20Code-Extension-007ACC.svg)](https://marketplace.visualstudio.com/items?itemName=FulcrumStudio.blogbuddy)
 
 [中文 README](docs/README_CN.md) · [Full guide](docs/help.md) · [Changelog](CHANGELOG.md)
@@ -162,7 +162,7 @@ Bloggers and technical writers who live in Markdown, already work with an agent,
 
 ## Feedback
 
-Bug or feature request → [open an issue](https://github.com/FulcrumStd/blogbuddy/issues).
+Bug or feature request → [open an issue](https://github.com/SandyKidYao/blogbuddy/issues).
 
 ---
 
