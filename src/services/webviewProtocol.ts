@@ -2,27 +2,19 @@
  * Webview ↔ Extension Host 消息协议类型定义
  */
 
+import type { WireUpdate } from './textSync';
+
 // ===== Webview → Extension Host =====
 
 export interface WebviewReadyMessage {
     type: 'ready';
 }
 
-export interface WebviewEditMetadata {
-    revision: number;
-    editVersion: number;
-}
-
-export interface EditorDocumentStats {
-    words: number;
-    characters: number;
-    lines: number;
-    selectedWords: number;
-}
-
-export interface WebviewStatsMessage {
-    type: 'document-stats';
-    stats: EditorDocumentStats;
+/** Where the selection is (offsets in the webview's text), for the status bar's selected-words count. */
+export interface WebviewSelectionMessage {
+    type: 'selection';
+    from: number;
+    to: number;
 }
 
 /** What a margin note is about: one block, a heading's whole section, or several adjacent blocks. */
@@ -57,37 +49,26 @@ export interface WebviewNotesSaveMessage {
     notes: unknown[];
 }
 
-export interface WebviewSaveMessage extends WebviewEditMetadata {
+/**
+ * The webview's unconfirmed changes (@codemirror/collab updates), based on the
+ * document version it has seen. Only one push is in flight at a time.
+ */
+export interface WebviewPushMessage {
+    type: 'push';
+    /** Sync session; a push from before a reset is turned away. */
+    epoch: number;
+    version: number;
+    updates: WireUpdate[];
+}
+
+/** The webview received updates it cannot place; it asks to start over from the document. */
+export interface WebviewResyncMessage {
+    type: 'resync';
+}
+
+/** Save the document (⌘S), once the webview's changes have all reached it. */
+export interface WebviewSaveMessage {
     type: 'save';
-    content: string;
-    frontmatter: string;
-    flushId?: string;
-}
-
-export interface WebviewOpenFileMessage {
-    type: 'open-file';
-}
-
-export interface WebviewNewFileMessage {
-    type: 'new-file';
-}
-
-export interface WebviewDirtyMessage extends WebviewEditMetadata {
-    type: 'dirty';
-    isDirty: boolean;
-}
-
-export interface WebviewAutoSaveMessage extends WebviewEditMetadata {
-    type: 'auto-save';
-    content: string;
-    frontmatter: string;
-    flushId?: string;
-}
-
-export interface WebviewDraftMessage extends WebviewEditMetadata {
-    type: 'document-change';
-    content: string;
-    frontmatter: string;
 }
 
 export interface WebviewFileUploadMessage {
@@ -98,13 +79,6 @@ export interface WebviewFileUploadMessage {
     dataBase64: string;
 }
 
-export interface WebviewConflictResolveMessage {
-    type: 'conflict-resolve';
-    choice: 'reload' | 'keep';
-    revision: number;
-    conflictId: number;
-}
-
 /** Zen: centered, distraction-free writing and reading. Editor: full width with line numbers and frontmatter. */
 export type LayoutMode = 'zen' | 'editor';
 
@@ -112,63 +86,46 @@ export interface WebviewToggleLayoutModeMessage {
     type: 'toggle-layout-mode';
 }
 
-/** Reply to 'request-save' when nothing changed since load — no write needed. */
-export interface WebviewFlushNoopMessage {
-    type: 'flush-noop';
-    flushId: string;
-    revision: number;
-}
-
-export interface WebviewReloadAppliedMessage {
-    type: 'reload-applied';
-    reloadId: number;
-    revision: number;
-}
-
-export interface WebviewReloadRejectedMessage extends WebviewEditMetadata {
-    type: 'reload-rejected';
-    reloadId: number;
-    content: string;
-    frontmatter: string;
-}
-
-export interface WebviewFlushFailedMessage {
-    type: 'flush-failed';
-    flushId: string;
-}
-
 export type WebviewMessage =
     | WebviewReadyMessage
+    | WebviewPushMessage
+    | WebviewResyncMessage
+    | WebviewSaveMessage
     | WebviewNoteAskMessage
     | WebviewNoteCancelMessage
     | WebviewNotesSaveMessage
-    | WebviewSaveMessage
-    | WebviewOpenFileMessage
-    | WebviewNewFileMessage
-    | WebviewDirtyMessage
-    | WebviewAutoSaveMessage
-    | WebviewDraftMessage
     | WebviewFileUploadMessage
-    | WebviewConflictResolveMessage
     | WebviewToggleLayoutModeMessage
-    | WebviewFlushNoopMessage
-    | WebviewFlushFailedMessage
-    | WebviewReloadAppliedMessage
-    | WebviewReloadRejectedMessage
-    | WebviewStatsMessage;
+    | WebviewSelectionMessage;
 
 // ===== Extension Host → Webview =====
 
-export interface HostLoadMessage {
-    type: 'load';
-    content: string;
-    frontmatter?: string;
-    filePath?: string;
+/** The document as it is now: sent when the webview is ready, and again after the two sides lost track. */
+export interface HostInitMessage {
+    type: 'init';
+    epoch: number;
+    version: number;
+    /** The document's text, line breaks as "\n". */
+    text: string;
+    /** The document's folder as a webview URI, for relative image paths. */
     baseUri?: string;
-    revision: number;
-    reloadId?: number;
-    previousRevision?: number;
-    expectedEditVersion?: number;
+    /** Notes kept for this document; only on the first init (a resync keeps the notes already open). */
+    notes?: unknown[];
+}
+
+/** Changes to the document, numbered from `version`: the webview's own, confirmed, and everyone else's. */
+export interface HostUpdatesMessage {
+    type: 'updates';
+    epoch: number;
+    version: number;
+    updates: WireUpdate[];
+}
+
+/** Whether a push was written. When it was not, the webview rebases over the updates it receives and pushes again. */
+export interface HostPushResultMessage {
+    type: 'push-result';
+    epoch: number;
+    ok: boolean;
 }
 
 /** What the agent is doing right now, in a few words. */
@@ -195,31 +152,10 @@ export interface HostNoteErrorMessage {
     message: string;
 }
 
-/** Notes saved for this document earlier; sent once after each fresh load. */
-export interface HostNotesLoadMessage {
-    type: 'notes-load';
-    notes: unknown[];
-}
-
-export interface HostSavedMessage {
-    type: 'saved';
-    success: boolean;
-    filePath?: string;
-    revision: number;
-    editVersion: number;
-    content?: string;
-    message?: string;
-}
-
-export interface HostThemeMessage {
-    type: 'theme';
-    kind: 'light' | 'dark' | 'highContrast';
-}
-
 export interface HostFileUploadedMessage {
     type: 'file-uploaded';
     uploadId: string;
-    webviewUri: string;
+    /** Relative to the document, as the Markdown link should read. */
     relativePath: string;
     isImage: boolean;
     fileName: string;
@@ -231,46 +167,22 @@ export interface HostFileUploadErrorMessage {
     message: string;
 }
 
-export interface HostConflictMessage {
-    type: 'conflict';
-    conflictId: number;
-    revision: number;
-}
-
-export interface HostRebaseMessage {
-    type: 'rebase';
-    revision: number;
-}
-
 export interface HostSetLayoutModeMessage {
     type: 'set-layout-mode';
     mode: LayoutMode;
 }
 
-export interface HostRequestSaveMessage {
-    type: 'request-save';
-    flushId: string;
-    freeze?: boolean;
-}
-
-export interface HostEditUnlockMessage { type: 'edit-unlock'; flushId?: string; }
-
-/** Status-only notice (e.g. the file became unreadable); never settles a pending save. */
+/** A short notice for the writer (e.g. an upload or save that failed). */
 export interface HostNoticeMessage { type: 'notice'; message: string; }
 
 export type HostMessage =
-    | HostLoadMessage
+    | HostInitMessage
+    | HostUpdatesMessage
+    | HostPushResultMessage
     | HostNoteProgressMessage
     | HostNoteDoneMessage
     | HostNoteErrorMessage
-    | HostNotesLoadMessage
-    | HostSavedMessage
     | HostNoticeMessage
-    | HostThemeMessage
     | HostFileUploadedMessage
     | HostFileUploadErrorMessage
-    | HostConflictMessage
-    | HostSetLayoutModeMessage
-    | HostRequestSaveMessage
-    | HostEditUnlockMessage
-    | HostRebaseMessage;
+    | HostSetLayoutModeMessage;

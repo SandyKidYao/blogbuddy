@@ -2,7 +2,13 @@ import * as vscode from 'vscode';
 import { MarkdownStatsAnalyzer } from '../utils/MarkdownStatsAnalyzer';
 import { extractFrontmatter } from '../utils/frontmatter';
 import { editorStatus } from '../services/EditorStatus';
-import type { EditorDocumentStats } from '../services/webviewProtocol';
+
+interface EditorDocumentStats {
+    words: number;
+    characters: number;
+    lines: number;
+    selectedWords: number;
+}
 
 export function registerDocumentInfoCommand(context: vscode.ExtensionContext) {
     const display = new DocumentInfoStatusBar(context);
@@ -33,10 +39,8 @@ class DocumentInfoStatusBar implements vscode.Disposable {
             vscode.window.onDidChangeTextEditorSelection(() => this.scheduleUpdate()),
             vscode.window.onDidChangeActiveTextEditor(() => this.scheduleUpdate()),
             vscode.workspace.onDidChangeTextDocument((event) => {
-                const activeEditor = vscode.window.activeTextEditor;
-                if (activeEditor && event.document === activeEditor.document) {
-                    this.scheduleUpdate();
-                }
+                const shown = editorStatus.current?.document ?? vscode.window.activeTextEditor?.document;
+                if (event.document === shown) { this.scheduleUpdate(); }
             }),
         );
     }
@@ -46,27 +50,24 @@ class DocumentInfoStatusBar implements vscode.Disposable {
         this.updateTimeout = setTimeout(() => this.refresh(), 300);
     }
 
+    /** The same counts for BB Editor and the text editor, both from the TextDocument. */
     private refresh(): void {
         const live = editorStatus.current;
-        if (live) {
-            this.show(live);
-            return;
-        }
         const editor = vscode.window.activeTextEditor;
-        if (!editor || editor.document.languageId !== 'markdown') {
+        const document = live?.document ?? (editor?.document.languageId === 'markdown' ? editor.document : undefined);
+        if (!document) {
             this.statusBarItem.hide();
             return;
         }
 
         try {
-            const content = editor.document.getText();
-            const stats = this.markdownAnalyzer.analyze(extractFrontmatter(content).body);
-            const selected = editor.selection.isEmpty
-                ? undefined : this.markdownAnalyzer.analyze(editor.document.getText(editor.selection));
+            const stats = this.markdownAnalyzer.analyze(extractFrontmatter(document.getText()).body);
+            const selection = live ? live.selection : editor && !editor.selection.isEmpty ? document.getText(editor.selection) : '';
+            const selected = selection ? this.markdownAnalyzer.analyze(selection) : undefined;
             this.show({
                 words: stats.chineseCharacters + stats.englishWords,
                 characters: stats.totalCharacters,
-                lines: editor.document.lineCount,
+                lines: document.lineCount,
                 selectedWords: selected ? selected.chineseCharacters + selected.englishWords : 0,
             });
         } catch (error) {

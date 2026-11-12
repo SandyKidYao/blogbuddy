@@ -1,0 +1,231 @@
+/* The editor itself: the Markdown source with live preview, set as reading
+ * typography. Layout, frontmatter, notes and notices are in styles.css.
+ * CodeMirror injects its base theme after page stylesheets, so overrides are
+ * scoped under #editor to win. */
+
+/* ===== Editor surface ===== */
+
+#editor .cm-editor {
+    flex: 1 0 auto;
+    background: transparent;
+    color: var(--vscode-editor-foreground);
+    font-size: 15px;
+}
+#editor .cm-editor.cm-focused { outline: none; }
+#editor .cm-scroller {
+    font-family: var(--vscode-font-family, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif);
+    line-height: 1.85;
+    overflow: visible;
+}
+#editor .cm-content {
+    padding: 0;
+    /* Scroll past end: the last line can scroll up near the top of the viewport. */
+    padding-bottom: max(0px, calc(var(--bb-viewport-height, 0px) - 6em));
+    caret-color: var(--vscode-editorCursor-foreground, var(--vscode-editor-foreground));
+}
+#editor .cm-line { padding: 0; }
+#editor .cm-placeholder { color: var(--vscode-input-placeholderForeground, #888); font-style: italic; }
+
+/* ===== Live preview ===== */
+
+/* Syntax marks on the caret's line: present, but quiet. */
+#editor .md-mk, #editor .md-num { color: var(--vscode-descriptionForeground, #888); opacity: 0.65; }
+#editor .md-num { opacity: 0.9; }
+
+#editor .cm-line.md-h { font-weight: 650; color: var(--vscode-editor-foreground); }
+#editor .cm-line.md-h1 { font-size: 1.75em; line-height: 1.35; padding-top: 0.15em; }
+#editor .cm-line.md-h2 { font-size: 1.35em; line-height: 1.4; padding-top: 0.75em; }
+#editor .cm-line.md-h3 { font-size: 1.15em; line-height: 1.5; padding-top: 0.5em; }
+#editor .cm-line.md-h4 { font-size: 1em; padding-top: 0.3em; }
+
+#editor .md-strong { font-weight: 650; }
+#editor .md-em { font-style: italic; }
+#editor .md-strike { text-decoration: line-through; text-decoration-color: color-mix(in srgb, currentColor 55%, transparent); }
+#editor .md-done { color: var(--vscode-descriptionForeground, #888); text-decoration: line-through; text-decoration-color: color-mix(in srgb, currentColor 55%, transparent); }
+#editor .md-code {
+    font-family: var(--vscode-editor-font-family, 'Consolas', 'Courier New', monospace);
+    background: var(--vscode-textCodeBlock-background, rgba(255, 255, 255, 0.06));
+    padding: 2px 4px;
+    border-radius: 3px;
+    font-size: 0.9em;
+}
+#editor .md-link { color: var(--vscode-textLink-foreground, #4fc1ff); }
+#editor .md-html { font: 0.85em var(--vscode-editor-font-family, ui-monospace, monospace); color: var(--vscode-descriptionForeground, #888); opacity: 0.75; }
+
+/* Blank lines between blocks shrink to paragraph spacing; so does a hidden setext underline. */
+#editor .cm-line.md-gap, #editor .cm-line.md-setext-rule { line-height: 0.9em; }
+
+#editor .cm-line.md-quote {
+    padding-left: 1em;
+    color: var(--vscode-textBlockQuote-foreground, #aaa);
+    box-shadow: inset 2px 0 0 var(--vscode-textBlockQuote-border, #FFD900);
+}
+
+/* Lists hang their marker in the indent, so wrapped lines align with the text. */
+#editor .cm-line.md-li { padding-left: 1.4em; text-indent: -1.4em; }
+#editor .md-bullet { display: inline-block; width: 1.4em; text-indent: 0; color: var(--vscode-editor-foreground); opacity: 0.75; }
+#editor .md-task { display: inline-block; width: 1.4em; text-indent: 0; }
+#editor .md-task input { width: 13px; height: 13px; margin: 0; vertical-align: -2px; cursor: pointer; accent-color: var(--vscode-textLink-foreground, #4fc1ff); }
+
+#editor .cm-line.md-hr {
+    background: linear-gradient(var(--vscode-panel-border, #444), var(--vscode-panel-border, #444)) center / 100% 1px no-repeat;
+}
+
+/* Fenced code: one tinted box; the fences turn into a small label while the caret is elsewhere. */
+#editor .cm-line.md-codeblock {
+    font-family: var(--vscode-editor-font-family, 'Consolas', 'Courier New', monospace);
+    font-size: 13.5px;
+    line-height: 1.6;
+    padding: 0 16px;
+    background: var(--vscode-textCodeBlock-background, rgba(255, 255, 255, 0.06));
+}
+#editor .cm-line.md-fence-open { border-radius: 4px 4px 0 0; padding-top: 6px; }
+#editor .cm-line.md-fence-close { border-radius: 0 0 4px 4px; padding-bottom: 6px; }
+#editor .cm-line.md-fence.is-quiet { font-size: 11px; line-height: 1.6; color: var(--vscode-descriptionForeground, #888); opacity: 0.7; }
+#editor .md-code-info { color: var(--vscode-descriptionForeground, #888); }
+#editor .cm-line.md-table-src { font-family: var(--vscode-editor-font-family, ui-monospace, monospace); font-size: 13px; }
+
+#editor .md-img { display: block; max-width: 100%; margin: 4px 0; border-radius: 4px; }
+#editor .md-img.is-broken { min-height: 24px; min-width: 80px; outline: 1px dashed var(--vscode-panel-border, #444); }
+
+/* Code colours (classHighlighter tokens): code blocks and the raw frontmatter. Dark themes by the class VS Code puts on the webview body. */
+#editor :is(.md-codeblock, .fm-raw) .tok-comment { color: #6a737d; font-style: italic; }
+#editor :is(.md-codeblock, .fm-raw) .tok-keyword, #editor :is(.md-codeblock, .fm-raw) .tok-modifier, #editor :is(.md-codeblock, .fm-raw) .tok-operatorKeyword { color: #d73a49; }
+#editor :is(.md-codeblock, .fm-raw) .tok-string, #editor :is(.md-codeblock, .fm-raw) .tok-string2, #editor :is(.md-codeblock, .fm-raw) .tok-inserted { color: #032f62; }
+#editor :is(.md-codeblock, .fm-raw) .tok-number, #editor :is(.md-codeblock, .fm-raw) .tok-bool, #editor :is(.md-codeblock, .fm-raw) .tok-atom { color: #005cc5; }
+#editor :is(.md-codeblock, .fm-raw) .tok-typeName, #editor :is(.md-codeblock, .fm-raw) .tok-className, #editor :is(.md-codeblock, .fm-raw) .tok-namespace { color: #6f42c1; }
+#editor :is(.md-codeblock, .fm-raw) .tok-propertyName, #editor :is(.md-codeblock, .fm-raw) .tok-attributeName { color: #005cc5; }
+#editor :is(.md-codeblock, .fm-raw) .tok-deleted, #editor :is(.md-codeblock, .fm-raw) .tok-invalid { color: #b31d28; }
+#editor :is(.md-codeblock, .fm-raw) .tok-meta, #editor :is(.md-codeblock, .fm-raw) .tok-punctuation { color: #586069; }
+body:not(.vscode-light):not(.vscode-high-contrast-light) #editor :is(.md-codeblock, .fm-raw) .tok-comment { color: #6a9955; }
+body:not(.vscode-light):not(.vscode-high-contrast-light) #editor :is(.md-codeblock, .fm-raw) .tok-keyword,
+body:not(.vscode-light):not(.vscode-high-contrast-light) #editor :is(.md-codeblock, .fm-raw) .tok-modifier,
+body:not(.vscode-light):not(.vscode-high-contrast-light) #editor :is(.md-codeblock, .fm-raw) .tok-operatorKeyword { color: #569cd6; }
+body:not(.vscode-light):not(.vscode-high-contrast-light) #editor :is(.md-codeblock, .fm-raw) .tok-string,
+body:not(.vscode-light):not(.vscode-high-contrast-light) #editor :is(.md-codeblock, .fm-raw) .tok-string2,
+body:not(.vscode-light):not(.vscode-high-contrast-light) #editor :is(.md-codeblock, .fm-raw) .tok-inserted { color: #ce9178; }
+body:not(.vscode-light):not(.vscode-high-contrast-light) #editor :is(.md-codeblock, .fm-raw) .tok-number,
+body:not(.vscode-light):not(.vscode-high-contrast-light) #editor :is(.md-codeblock, .fm-raw) .tok-bool,
+body:not(.vscode-light):not(.vscode-high-contrast-light) #editor :is(.md-codeblock, .fm-raw) .tok-atom { color: #b5cea8; }
+body:not(.vscode-light):not(.vscode-high-contrast-light) #editor :is(.md-codeblock, .fm-raw) .tok-typeName,
+body:not(.vscode-light):not(.vscode-high-contrast-light) #editor :is(.md-codeblock, .fm-raw) .tok-className,
+body:not(.vscode-light):not(.vscode-high-contrast-light) #editor :is(.md-codeblock, .fm-raw) .tok-namespace { color: #4ec9b0; }
+body:not(.vscode-light):not(.vscode-high-contrast-light) #editor :is(.md-codeblock, .fm-raw) .tok-propertyName,
+body:not(.vscode-light):not(.vscode-high-contrast-light) #editor :is(.md-codeblock, .fm-raw) .tok-attributeName { color: #9cdcfe; }
+body:not(.vscode-light):not(.vscode-high-contrast-light) #editor :is(.md-codeblock, .fm-raw) .tok-variableName { color: #9cdcfe; }
+body:not(.vscode-light):not(.vscode-high-contrast-light) #editor :is(.md-codeblock, .fm-raw) .tok-meta,
+body:not(.vscode-light):not(.vscode-high-contrast-light) #editor :is(.md-codeblock, .fm-raw) .tok-punctuation { color: #d4d4d4; }
+
+/* ===== Rendered Markdown: tables in the text, agent answers, proposed blocks ===== */
+
+.bb-md, .md-table { white-space: normal; }
+.bb-md > :first-child, .md-table > :first-child { margin-top: 0; }
+.bb-md > :last-child, .md-table > :last-child { margin-bottom: 0; }
+.bb-md p, .bb-note-a p { margin: 0 0 0.45em; }
+.bb-md h1, .bb-md h2, .bb-md h3, .bb-md h4 { margin: 0.3em 0; line-height: 1.35; }
+.bb-md h1 { font-size: 1.75em; } .bb-md h2 { font-size: 1.35em; } .bb-md h3 { font-size: 1.15em; }
+.bb-md ul, .bb-md ol, .bb-note-a ul, .bb-note-a ol { margin: 0 0 0.45em; padding-left: 1.5em; }
+.bb-md li > p, .bb-note-a li > p { margin: 0; }
+.bb-md li, .bb-note-a li { margin: 0.15em 0; }
+.bb-md blockquote, .bb-note-a blockquote {
+    margin: 0 0 0.45em; padding-left: 1em;
+    border-left: 2px solid var(--vscode-textBlockQuote-border, #FFD900);
+    color: var(--vscode-textBlockQuote-foreground, #aaa);
+}
+.bb-md code, .bb-note-a code, .md-table code {
+    font-family: var(--vscode-editor-font-family, 'Consolas', 'Courier New', monospace);
+    background: var(--vscode-textCodeBlock-background, rgba(255, 255, 255, 0.06));
+    padding: 1px 4px; border-radius: 3px; font-size: 0.9em;
+}
+.bb-md pre, .bb-note-a pre {
+    margin: 0 0 0.45em; padding: 8px 12px; border-radius: 4px; overflow-x: auto;
+    background: var(--vscode-textCodeBlock-background, rgba(255, 255, 255, 0.06));
+}
+.bb-md pre code, .bb-note-a pre code { background: none; padding: 0; }
+.bb-md a, .bb-note-a a, .md-table a { color: var(--vscode-textLink-foreground, #4fc1ff); text-decoration: none; }
+.bb-md img, .bb-note-a img, .md-table img { max-width: 100%; border-radius: 4px; }
+.bb-md hr { border: none; border-top: 1px solid var(--vscode-panel-border, #444); margin: 0.6em 0; }
+.bb-md input[type="checkbox"] { margin-right: 0.4em; vertical-align: -1px; }
+
+/* Tables: horizontal rules only, sized to their content. */
+.md-table { padding: 2px 0 6px; cursor: text; }
+.md-table table, .bb-md table { min-width: 50%; border-collapse: collapse; }
+.md-table th, .md-table td, .bb-md th, .bb-md td {
+    border: none; border-bottom: 1px solid var(--vscode-panel-border, #444);
+    padding: 5px 24px 5px 0; text-align: left; line-height: 1.6;
+}
+.md-table th, .bb-md th { color: var(--vscode-descriptionForeground, #888); font-size: 0.9em; font-weight: 500; }
+
+/* ===== Margin notes inside the editor ===== */
+
+/* Blocks the editor lays out (panel, note cards, proposed blocks, tables) contain their
+ * children's margins: the editor measures border boxes, and a leaking margin would put
+ * every click below them a line off. */
+#editor .cm-content > #frontmatter-panel, #editor .cm-content .bb-note,
+#editor .cm-content .bb-preview, #editor .cm-content .md-table { display: flow-root; }
+#editor .cm-content > #frontmatter-panel[hidden] { display: none; }
+/* The raw frontmatter is a small editor inside the big one: code typography, none of the page's reading rhythm. */
+#editor .fm-raw .cm-editor { font-size: 12.5px; margin: 0; }
+#editor .fm-raw .cm-scroller { font-family: var(--vscode-editor-font-family, ui-monospace, monospace); line-height: 1.6; }
+#editor .fm-raw .cm-content { padding: 2px 0; }
+#editor .fm-raw .cm-editor.cm-focused { outline: none; }
+/* The panel keeps its own typography inside the editor (which sets pre-wrap and reading line height). */
+#editor .cm-content > #frontmatter-panel { white-space: normal; line-height: normal; cursor: default; }
+
+#editor .cm-content .bb-note {
+    /* Space below the band or card is padding: block widgets must not carry margins. */
+    position: relative; padding: 2px 0 16px; font-size: 13.5px; line-height: 1.7;
+    white-space: normal; cursor: default; transition: opacity 0.4s ease;
+    font-family: var(--vscode-font-family, sans-serif);
+}
+#editor .cm-content .bb-preview { padding: 2px 8px; margin: 0 -8px; border-radius: 4px; cursor: default; }
+#editor .cm-line.bb-d-old { color: var(--bb-dim); background: color-mix(in srgb, var(--bb-del) 6%, transparent); }
+#editor .cm-line.bb-d-del { color: var(--bb-dim); background: color-mix(in srgb, var(--bb-del) 9%, transparent); }
+#editor .cm-line.bb-d-from { color: var(--bb-dim); opacity: 0.7; }
+#editor .bb-ins { white-space: pre-wrap; }
+
+/* ===== Find (⌘F) ===== */
+
+#editor .cm-panels {
+    background: var(--vscode-editorWidget-background, #252526);
+    color: var(--vscode-editorWidget-foreground, var(--vscode-editor-foreground));
+    border-bottom: 1px solid var(--vscode-editorWidget-border, var(--vscode-panel-border, #454545));
+    z-index: 30;
+}
+#editor .cm-panels-top { border-bottom: 1px solid var(--vscode-editorWidget-border, var(--vscode-panel-border, #454545)); }
+#editor .cm-search { font: 12px var(--vscode-font-family, sans-serif); padding: 4px 8px 6px; }
+#editor .cm-search input, #editor .cm-search button {
+    font: inherit; color: inherit; border-radius: 3px;
+    background: var(--vscode-input-background, #3c3c3c);
+    border: 1px solid var(--vscode-input-border, transparent);
+}
+#editor .cm-search .cm-textfield { padding: 2px 6px; }
+#editor .cm-search .cm-textfield:focus { outline: 1px solid var(--vscode-focusBorder, #007acc); }
+#editor .cm-search button { padding: 1px 8px; background: var(--vscode-button-secondaryBackground, #3a3d41); cursor: pointer; }
+#editor .cm-search label { font-size: 11px; color: var(--vscode-descriptionForeground, #888); }
+#editor .cm-searchMatch { background: var(--vscode-editor-findMatchHighlightBackground, rgba(234, 92, 0, 0.33)); }
+#editor .cm-searchMatch-selected { background: var(--vscode-editor-findMatchBackground, rgba(81, 92, 106, 0.8)); }
+
+/* ===== Slash menu (autocomplete) ===== */
+
+.cm-tooltip.bb-slash-tooltip {
+    background: var(--vscode-menu-background, #252526);
+    border: 1px solid var(--vscode-menu-border, #454545);
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    padding: 4px;
+}
+#editor .cm-tooltip.bb-slash-tooltip > ul { font-family: var(--vscode-font-family, sans-serif); max-height: 300px; min-width: 220px; }
+.cm-tooltip.bb-slash-tooltip > ul > li.bb-slash-option {
+    display: flex; align-items: baseline; justify-content: space-between; gap: 16px;
+    padding: 5px 10px; border-radius: 4px; color: var(--vscode-menu-foreground, #ccc); line-height: 1.4;
+}
+.cm-tooltip.bb-slash-tooltip > ul > li.bb-slash-option[aria-selected] {
+    background: var(--vscode-menu-selectionBackground, #094771);
+    color: var(--vscode-menu-selectionForeground, #fff);
+}
+.bb-slash-option .cm-completionLabel { font-size: 13px; font-weight: 500; }
+.bb-slash-option .cm-completionDetail {
+    font: 11px var(--vscode-editor-font-family, ui-monospace, monospace);
+    font-style: normal; color: var(--vscode-descriptionForeground, #888); margin-left: 0;
+}

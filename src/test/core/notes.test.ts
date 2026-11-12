@@ -16,6 +16,11 @@ suite('notes', () => {
     test('an unsaved document is described as such instead of pointing at a file', () => {
         assert.ok(buildNotePrompt(request).includes('还没有保存到磁盘'));
     });
+    test('unsaved changes are mentioned, so the agent trusts the scope over the file', () => {
+        const prompt = buildNotePrompt({ ...request, filePath: '/blog/post.md', unsavedChanges: true });
+        assert.ok(prompt.includes('/blog/post.md') && prompt.includes('还没保存的修改'));
+        assert.ok(!buildNotePrompt({ ...request, filePath: '/blog/post.md' }).includes('还没保存的修改'));
+    });
     test('earlier turns of the note are replayed in order', () => {
         const prompt = buildNotePrompt({ ...request, history: [{ role: 'me', text: '这段怎么样' }, { role: 'ai', text: '有点长' }] });
         assert.ok(prompt.indexOf('写作者：这段怎么样') < prompt.indexOf('你：有点长'));

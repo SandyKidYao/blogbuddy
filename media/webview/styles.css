@@ -11,7 +11,6 @@
  * Only the text is left — no line numbers, frontmatter, heading hints or
  * column edges — and the last bits of chrome fade out while typing.
  * Editor Mode (body.bb-mode-editor): full width with every editing aid. */
-body.bb-mode-editor .conflict-banner,
 body.bb-mode-editor #editor {
     max-width: none;
 }
@@ -24,8 +23,6 @@ body.bb-mode-zen { background: var(--vscode-editor-background); }
 body.bb-mode-zen #editor { border-left-color: transparent; border-right-color: transparent; }
 body.bb-mode-zen .bb-source-gutter,
 body.bb-mode-zen #frontmatter-panel,
-body.bb-mode-zen .milkdown .block-handle { display: none !important; }
-body.bb-mode-zen .bb-heading-hint::after { content: none; }
 body.bb-mode-zen.bb-typing .bb-mode-toggle { opacity: 0; pointer-events: none; }
 body.bb-mode-zen.bb-typing #editor::-webkit-scrollbar-thumb { background: transparent; }
 
@@ -91,55 +88,6 @@ html, body {
     background: var(--vscode-sideBar-background, var(--vscode-editor-background));
 }
 
-/* ===== Conflict Banner ===== */
-
-.conflict-banner {
-    max-width: 860px;
-    margin: 0 auto;
-    width: 100%;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 12px;
-    background: var(--vscode-inputValidation-warningBackground, rgba(255, 204, 0, 0.15));
-    border: 1px solid var(--vscode-inputValidation-warningBorder, #bb8a00);
-    color: var(--vscode-editor-foreground);
-    font-size: 12px;
-    border-radius: 4px;
-    margin-top: 8px;
-}
-
-.conflict-banner.hidden {
-    display: none;
-}
-
-.conflict-msg {
-    flex: 1;
-}
-
-.conflict-btn {
-    background: var(--vscode-button-secondaryBackground, rgba(128, 128, 128, 0.2));
-    color: var(--vscode-button-secondaryForeground, inherit);
-    border: 1px solid var(--vscode-button-border, transparent);
-    padding: 4px 10px;
-    border-radius: 3px;
-    cursor: pointer;
-    font-size: 12px;
-}
-
-.conflict-btn:hover {
-    background: var(--vscode-button-secondaryHoverBackground, rgba(128, 128, 128, 0.3));
-}
-
-.conflict-btn-primary {
-    background: var(--vscode-button-background, #0e639c);
-    color: var(--vscode-button-foreground, #fff);
-}
-
-.conflict-btn-primary:hover {
-    background: var(--vscode-button-hoverBackground, #1177bb);
-}
-
 /* ===== Frontmatter =====
  * The document's own head, inside the scroll flow and framed by the file's
  * real "---" fences. Keys are the literal YAML keys; values are edited in
@@ -147,7 +95,8 @@ html, body {
 
 .fm {
     flex: none;
-    margin: 0 0 28px;
+    /* Padding, not margin: the panel is a block in the editor, which measures its border box. */
+    padding: 0 0 28px;
     font-size: 13px;
     color: var(--vscode-descriptionForeground, #888);
 }
@@ -394,23 +343,17 @@ textarea.fm-input { display: block; resize: none; overflow: hidden; }
     cursor: pointer;
 }
 
+/* The raw frontmatter: a small code editor (see editor.css for its typography). */
 .fm-raw {
     display: block;
     width: 100%;
-    margin: 6px 0;
-    padding: 0;
-    background: none;
-    border: none;
-    outline: none;
-    resize: none;
-    overflow: hidden;
+    padding: 6px 0;
     color: var(--vscode-editor-foreground);
-    font: 13px/1.6 var(--vscode-editor-font-family, ui-monospace, monospace);
 }
 
 .fm-close { padding: 3px 0; }
 
-/* ===== Milkdown Editor ===== */
+/* ===== Editor layout ===== */
 
 #editor {
     flex: 1;
@@ -433,310 +376,6 @@ body {
     height: 100vh;
 }
 
-/* Milkdown default overrides */
-.milkdown {
-    color: var(--vscode-editor-foreground);
-    background: transparent;
-    display: flex;
-    flex-direction: column;
-    flex: 1 0 auto;
-}
-
-.milkdown .editor {
-    padding: 0;
-    outline: none;
-    flex: 1;
-    font-size: 15px;
-    /* Scroll past end: let the last line scroll up near the top of the
-     * viewport instead of forcing users to type at the bottom edge.
-     * --bb-viewport-height is the #editor height, kept in sync from index.ts. */
-    padding-bottom: max(0px, calc(var(--bb-viewport-height, 0px) - 6em));
-}
-
-/* Placeholder for empty editor */
-.milkdown .editor > p:first-child:last-child:has(> br:only-child)::before {
-    content: '开始写作，输入 / 调出 BB 命令';
-    color: var(--vscode-input-placeholderForeground, #888);
-    float: left;
-    height: 0;
-    pointer-events: none;
-    font-style: italic;
-}
-
-/* Block-level styling */
-.milkdown p {
-    margin: 0 0 0.9em;
-    line-height: 1.85;
-}
-
-/* Paragraphs nested in lists, tables and quotes follow their container's rhythm. */
-.milkdown li > p,
-.milkdown th > p,
-.milkdown td > p,
-.milkdown blockquote > p:last-child { margin: 0; }
-
-.milkdown li { margin: 0.15em 0; }
-
-.milkdown h1, .milkdown h2, .milkdown h3,
-.milkdown h4, .milkdown h5, .milkdown h6 {
-    margin: 1.4em 0 0.5em;
-    color: var(--vscode-editor-foreground);
-    line-height: 1.35;
-}
-
-.milkdown h1 { font-size: 1.75em; margin-top: 0.3em; }
-.milkdown h2 { font-size: 1.35em; margin-top: 1.6em; }
-.milkdown h3 { font-size: 1.15em; }
-
-.milkdown ul, .milkdown ol {
-    margin: 0 0 0.9em;
-    padding-left: 1.5em;
-}
-
-.milkdown blockquote {
-    margin: 0 0 0.9em;
-    padding-left: 1em;
-    border-left: 2px solid var(--vscode-textBlockQuote-border, #FFD900);
-    color: var(--vscode-textBlockQuote-foreground, #aaa);
-}
-
-.milkdown code {
-    font-family: var(--vscode-editor-fontFamily, 'Consolas', 'Courier New', monospace);
-    background: var(--vscode-textCodeBlock-background, rgba(255, 255, 255, 0.06));
-    padding: 2px 5px;
-    border-radius: 3px;
-    font-size: 0.9em;
-}
-
-.milkdown pre {
-    margin: 0 0 0.9em;
-    padding: 12px 16px;
-    background: var(--vscode-textCodeBlock-background, rgba(255, 255, 255, 0.06));
-    border-radius: 4px;
-    overflow-x: auto;
-}
-
-.milkdown pre code {
-    background: transparent;
-    padding: 0;
-}
-
-/* ===== Prism code highlighting ===== */
-/* Uses Milkdown's default light palette; dark theme overrides below. */
-
-.milkdown pre code .token.comment,
-.milkdown pre code .token.prolog,
-.milkdown pre code .token.doctype,
-.milkdown pre code .token.cdata {
-    color: #6a9955;
-    font-style: italic;
-}
-
-.milkdown pre code .token.punctuation {
-    color: var(--vscode-editor-foreground);
-    opacity: 0.7;
-}
-
-.milkdown pre code .token.property,
-.milkdown pre code .token.tag,
-.milkdown pre code .token.constant,
-.milkdown pre code .token.symbol,
-.milkdown pre code .token.deleted {
-    color: #d73a49;
-}
-
-.milkdown pre code .token.boolean,
-.milkdown pre code .token.number {
-    color: #005cc5;
-}
-
-.milkdown pre code .token.selector,
-.milkdown pre code .token.attr-name,
-.milkdown pre code .token.string,
-.milkdown pre code .token.char,
-.milkdown pre code .token.builtin,
-.milkdown pre code .token.inserted {
-    color: #032f62;
-}
-
-.milkdown pre code .token.operator,
-.milkdown pre code .token.entity,
-.milkdown pre code .token.url,
-.milkdown pre code .language-css .token.string,
-.milkdown pre code .style .token.string {
-    color: #6f42c1;
-}
-
-.milkdown pre code .token.atrule,
-.milkdown pre code .token.attr-value,
-.milkdown pre code .token.keyword {
-    color: #d73a49;
-}
-
-.milkdown pre code .token.function,
-.milkdown pre code .token.class-name {
-    color: #6f42c1;
-}
-
-.milkdown pre code .token.regex,
-.milkdown pre code .token.important,
-.milkdown pre code .token.variable {
-    color: #e36209;
-}
-
-.milkdown pre code .token.important,
-.milkdown pre code .token.bold {
-    font-weight: bold;
-}
-
-.milkdown pre code .token.italic {
-    font-style: italic;
-}
-
-/* Dark theme overrides */
-body:not([data-theme="light"]) .milkdown pre code .token.comment,
-body:not([data-theme="light"]) .milkdown pre code .token.prolog,
-body:not([data-theme="light"]) .milkdown pre code .token.doctype,
-body:not([data-theme="light"]) .milkdown pre code .token.cdata {
-    color: #6a9955;
-}
-
-body:not([data-theme="light"]) .milkdown pre code .token.property,
-body:not([data-theme="light"]) .milkdown pre code .token.tag,
-body:not([data-theme="light"]) .milkdown pre code .token.constant,
-body:not([data-theme="light"]) .milkdown pre code .token.symbol,
-body:not([data-theme="light"]) .milkdown pre code .token.deleted,
-body:not([data-theme="light"]) .milkdown pre code .token.atrule,
-body:not([data-theme="light"]) .milkdown pre code .token.attr-value,
-body:not([data-theme="light"]) .milkdown pre code .token.keyword {
-    color: #569cd6;
-}
-
-body:not([data-theme="light"]) .milkdown pre code .token.boolean,
-body:not([data-theme="light"]) .milkdown pre code .token.number {
-    color: #b5cea8;
-}
-
-body:not([data-theme="light"]) .milkdown pre code .token.string,
-body:not([data-theme="light"]) .milkdown pre code .token.char,
-body:not([data-theme="light"]) .milkdown pre code .token.builtin,
-body:not([data-theme="light"]) .milkdown pre code .token.inserted,
-body:not([data-theme="light"]) .milkdown pre code .token.attr-name,
-body:not([data-theme="light"]) .milkdown pre code .token.selector {
-    color: #ce9178;
-}
-
-body:not([data-theme="light"]) .milkdown pre code .token.operator,
-body:not([data-theme="light"]) .milkdown pre code .token.entity,
-body:not([data-theme="light"]) .milkdown pre code .token.url {
-    color: #d4d4d4;
-}
-
-body:not([data-theme="light"]) .milkdown pre code .token.function,
-body:not([data-theme="light"]) .milkdown pre code .token.class-name {
-    color: #dcdcaa;
-}
-
-body:not([data-theme="light"]) .milkdown pre code .token.regex,
-body:not([data-theme="light"]) .milkdown pre code .token.important,
-body:not([data-theme="light"]) .milkdown pre code .token.variable {
-    color: #d7ba7d;
-}
-
-/* Tables: horizontal rules only, sized to their content. */
-.milkdown table {
-    min-width: 50%;
-    border-collapse: collapse;
-    margin: 0 0 0.9em;
-}
-
-.milkdown th, .milkdown td {
-    border: none;
-    border-bottom: 1px solid var(--vscode-panel-border, #444);
-    padding: 5px 24px 5px 0;
-    text-align: left;
-}
-
-.milkdown th {
-    color: var(--vscode-descriptionForeground, #888);
-    font-size: 0.9em;
-    font-weight: 500;
-}
-
-.milkdown hr {
-    margin: 1.5em 0;
-    border: none;
-    border-top: 1px solid var(--vscode-panel-border, #444);
-}
-
-.milkdown a {
-    color: var(--vscode-textLink-foreground, #4fc1ff);
-    text-decoration: none;
-}
-
-.milkdown a:hover {
-    text-decoration: underline;
-}
-
-.milkdown img {
-    max-width: 100%;
-    border-radius: 4px;
-}
-
-/* ===== Slash Menu ===== */
-
-.bb-slash-dropdown {
-    display: none;
-    position: absolute;
-    z-index: 100;
-}
-
-.bb-slash-dropdown[data-show="true"] {
-    display: block;
-}
-
-.bb-slash-menu {
-    background: var(--vscode-menu-background, #252526);
-    border: 1px solid var(--vscode-menu-border, #454545);
-    border-radius: 6px;
-    padding: 4px;
-    min-width: 240px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-    max-height: 300px;
-    overflow-y: auto;
-}
-
-.bb-slash-item {
-    display: flex;
-    flex-direction: column;
-    padding: 6px 10px;
-    border-radius: 4px;
-    cursor: pointer;
-    transition: background 0.1s ease;
-}
-
-.bb-slash-item--active {
-    background: var(--vscode-menu-selectionBackground, #094771);
-}
-
-.bb-slash-item__label {
-    font-size: 13px;
-    font-weight: 500;
-    color: var(--vscode-menu-foreground, #ccc);
-}
-
-.bb-slash-item__desc {
-    font-size: 11px;
-    color: var(--vscode-descriptionForeground, #888);
-    margin-top: 1px;
-}
-
-/* ===== Block Plugin Overrides ===== */
-
-.milkdown .block-handle {
-    color: var(--vscode-editorLineNumber-foreground, #666);
-}
-
 /* ===== Scrollbar ===== */
 
 #editor::-webkit-scrollbar {
@@ -756,19 +395,7 @@ body:not([data-theme="light"]) .milkdown pre code .token.variable {
     background: var(--vscode-scrollbarSlider-hoverBackground, rgba(100, 100, 100, 0.7));
 }
 
-/* ===== HTML structural-wrapper hiding =====
- * <div align="center">, </div>, <span>, etc. carry layout intent only. The
- * raw source is preserved by Milkdown's html node (round-trips on save); here
- * we just suppress visual rendering so the user isn't confronted with HTML
- * tags in the WYSIWYG view. When the wrapping paragraph has nothing else
- * inside, collapse it too so we don't leave a stray empty line.
- */
-.bb-html-structural { display: none; }
-.ProseMirror p:has(> .bb-html-structural):not(:has(> :not(.bb-html-structural))) {
-    display: none;
-}
-
-/* Source positions and document status in the original, minimal editor layout. */
+/* Source line numbers and notices. */
 [hidden] { display: none !important; }
 #editor-layout { display: flex; flex: 1; min-height: 0; overflow: hidden; }
 #editor { position: relative; min-width: 0; }
@@ -795,19 +422,7 @@ body:not([data-theme="light"]) .milkdown pre code .token.variable {
     opacity: 1;
     color: var(--vscode-editorLineNumber-activeForeground, var(--vscode-editor-foreground));
 }
-.bb-heading-hint { position: relative; }
-.bb-heading-hint::after {
-    content: attr(data-heading-level);
-    position: absolute;
-    top: -14px;
-    left: 0;
-    opacity: 0;
-    font: 10px/1.2 ui-monospace, monospace;
-    color: var(--vscode-descriptionForeground, #888);
-    pointer-events: none;
-}
-.bb-heading-hint:hover::after, .bb-heading-hint:focus-within::after { opacity: 1; }
-/* Notices: only what needs attention (failed save/upload, host notices). */
+/* Notices: only what needs attention (a failed upload, a document that cannot be written). */
 .bb-notice {
     position: fixed;
     right: 16px;
@@ -827,58 +442,68 @@ body:not([data-theme="light"]) .milkdown pre code .token.variable {
  * A note is a sentence left beside some blocks, the agent's answer, and — when
  * changes were asked for — a proposal shown block by block.
  * What informs sits on the left: the rail beside the note's blocks, the sign
- * beside each changed block, the summary line under the block. What acts sits
- * on the right: accept / reject beside each changed block.
- * None of it is in the document; the file changes only on accept. */
+ * beside each changed block, the note's band under the block. What acts sits
+ * on the right: accept / reject beside each changed block and on the card.
+ * A note is a tinted band (open: a tinted card); its colour is its state —
+ * amber unread or working, grey read, red failed. None of it is in the document. */
 
 body {
+    --bb-acc: #e0b25c;
+    --bb-err: var(--vscode-errorForeground, #f48771);
+    --bb-fg: var(--vscode-editor-foreground, #d4d4d4);
     --bb-dim: var(--vscode-descriptionForeground, #888);
     --bb-rule: var(--vscode-panel-border, rgba(128, 128, 128, 0.28));
     --bb-add: var(--vscode-editorGutter-addedBackground, #2ea043);
     --bb-del: var(--vscode-editorGutter-deletedBackground, #f85149);
     --bb-mod: var(--vscode-editorGutter-modifiedBackground, #0078d4);
-    --bb-ins-bg: var(--vscode-diffEditor-insertedTextBackground, rgba(155, 185, 85, 0.2));
-    --bb-del-bg: var(--vscode-diffEditor-removedTextBackground, rgba(255, 0, 0, 0.2));
+    --bb-mono: var(--vscode-editor-font-family, ui-monospace, monospace);
 }
+body.vscode-light, body.vscode-high-contrast-light { --bb-acc: #a86b00; }
 
 .bb-notes-layer { position: absolute; left: 0; top: 0; width: 100%; height: 0; pointer-events: none; z-index: 5; }
 .bb-notes-layer > * { position: absolute; pointer-events: auto; }
 .bb-notes-layer button, .bb-note button, .bb-inbox { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
 .bb-notes-layer button:focus-visible, .bb-note button:focus-visible, .bb-inbox:focus-visible {
-    outline: 1px solid var(--vscode-focusBorder, #007acc); outline-offset: 2px; border-radius: 2px;
+    outline: 1px solid var(--vscode-focusBorder, #007acc); outline-offset: 2px; border-radius: 3px;
 }
 
-/* Rail: faint = read, solid = unread, marching dashes = the agent is working. */
-.bb-rail { left: 41px; width: 12px; color: var(--bb-dim); opacity: 0.4; transition: opacity 0.4s ease, color 0.4s ease; }
+/* Rail: beside the note's blocks and its band, in the note's colour; marching dashes while working. */
+.bb-rail { left: 41px; width: 12px; color: var(--bb-dim); opacity: 0.55; transition: opacity 0.3s ease, color 0.3s ease; }
 .bb-rail::before { content: ''; position: absolute; left: 6px; top: 4px; bottom: 4px; width: 2px; border-radius: 1px; background: currentColor; }
-.bb-rail:hover, .bb-rail.is-open { opacity: 0.85; }
-.bb-rail.is-unread { opacity: 0.95; color: var(--vscode-editor-foreground); }
-.bb-rail.is-error { color: var(--vscode-errorForeground, #f48771); opacity: 0.8; }
-.bb-rail.is-working { opacity: 0.75; }
+.bb-rail:hover { opacity: 0.9; }
+.bb-rail.is-unread, .bb-rail.is-open, .bb-rail.is-working { color: var(--bb-acc); opacity: 1; }
+.bb-rail.is-error { color: var(--bb-err); opacity: 0.9; }
 .bb-rail.is-working::before, .bb-rail.is-preview::before {
     background: repeating-linear-gradient(to bottom, currentColor 0 4px, transparent 4px 8px);
 }
 .bb-rail.is-working::before { animation: bb-march 0.9s linear infinite; }
-.bb-rail.is-preview { pointer-events: none; opacity: 0.7; }
+.bb-rail.is-preview { pointer-events: none; color: var(--bb-acc); opacity: 0.7; }
 @keyframes bb-march { to { background-position: 0 8px; } }
 
-/* Changed blocks: sign and coloured bar on the left, accept / reject on the right. */
-.bb-sign { left: 35px; width: 12px; height: 18px; text-align: center; font: 12px/18px var(--vscode-editor-font-family, ui-monospace, monospace); user-select: none; }
-.bb-bar { left: 47px; width: 2px; border-radius: 1px; pointer-events: none; }
-.bb-sign.is-add { color: var(--bb-add); } .bb-bar.is-add { background: var(--bb-add); }
-.bb-sign.is-del { color: var(--bb-del); } .bb-bar.is-del { background: var(--bb-del); }
-.bb-sign.is-mod { color: var(--bb-mod); } .bb-bar.is-mod { background: var(--bb-mod); }
-.bb-ops { right: 12px; display: flex; gap: 2px; }
-.bb-ops button { width: 17px; height: 18px; border-radius: 3px; color: var(--bb-dim); font-size: 13px; line-height: 18px; opacity: 0.75; }
-.bb-ops button:hover { opacity: 1; color: var(--vscode-editor-foreground); background: var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, 0.15)); }
+/* Changed blocks: a sign on the left (the block's tint shows the extent), accept / reject on the right. */
+.bb-sign { left: 35px; width: 12px; height: 18px; text-align: center; font: 12px/18px var(--bb-mono); user-select: none; }
+.bb-bar { display: none; }
+.bb-sign.is-add { color: var(--bb-add); }
+.bb-sign.is-del { color: var(--bb-del); }
+.bb-sign.is-mod { color: var(--bb-mod); }
+.bb-ops { right: 8px; display: flex; gap: 3px; }
 
-.bb-ghost { left: 36px; width: 14px; height: 18px; color: var(--bb-dim); font-size: 12px; line-height: 18px; opacity: 0.35; transition: opacity 0.15s ease; }
-.bb-ghost:hover { opacity: 1; color: var(--vscode-editor-foreground); }
+/* Buttons: bordered, so they read as buttons; accept is green. */
+.bb-btn {
+    min-width: 28px; height: 26px; padding: 0 6px; border-radius: 5px; font-size: 13px; line-height: 24px;
+    border: 1px solid color-mix(in srgb, var(--bb-fg) 18%, transparent) !important; color: var(--bb-fg) !important;
+}
+.bb-btn:hover { background: var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, 0.15)) !important; }
+.bb-btn.is-yes { border-color: color-mix(in srgb, var(--bb-add) 60%, transparent) !important; color: var(--bb-add) !important; }
+.bb-ops .bb-btn { min-width: 22px; height: 22px; padding: 0; font-size: 12px; line-height: 20px; border-radius: 4px; background: var(--vscode-editor-background, #1e1e1e); }
+
+.bb-ghost { left: 36px; width: 14px; height: 18px; color: var(--bb-dim); font-size: 12px; line-height: 18px; opacity: 0.4; transition: opacity 0.15s ease; }
+.bb-ghost:hover { opacity: 1; color: var(--bb-acc); }
 body.bb-typing .bb-ghost { display: none; }
 
 .bb-ring {
-    display: inline-block; flex: none; width: 9px; height: 9px; border-radius: 50%;
-    border: 1px solid color-mix(in srgb, currentColor 28%, transparent); border-top-color: currentColor;
+    display: inline-block; flex: none; width: 10px; height: 10px; border-radius: 50%;
+    border: 1.5px solid color-mix(in srgb, currentColor 30%, transparent); border-top-color: currentColor;
     animation: bb-spin 1.2s linear infinite;
 }
 @keyframes bb-spin { to { transform: rotate(360deg); } }
@@ -890,78 +515,95 @@ body.bb-typing .bb-ghost { display: none; }
     border-radius: 6px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 .bb-ask { display: flex; align-items: center; gap: 8px; padding: 6px 10px; }
-.bb-ask-glyph { color: var(--bb-dim); font-size: 12px; }
+.bb-ask-glyph { color: var(--bb-acc); font-size: 12px; }
 .bb-ask input { flex: 1; min-width: 0; background: none; border: 0; outline: 0; color: var(--vscode-menu-foreground, inherit); font: 13px var(--vscode-font-family, sans-serif); }
-.bb-ask-scope, .bb-ask-key { flex: none; color: var(--bb-dim); font: 11px var(--vscode-editor-font-family, ui-monospace, monospace); opacity: 0.8; }
+.bb-ask-scope, .bb-ask-key { flex: none; color: var(--bb-dim); font: 11px var(--bb-mono); opacity: 0.8; }
 .bb-ask-scope { max-width: 45%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-/* The note itself: one summary line under its block, expanding in place into the thread. */
-.milkdown .bb-note {
-    position: relative; margin: -9px 0 14px; font-size: 13px; line-height: 1.7;
-    white-space: normal; cursor: default; transition: opacity 0.4s ease;
-}
-.bb-note button { color: var(--bb-dim); }
-.bb-note button:hover { color: var(--vscode-editor-foreground); }
-.bb-note-ops { display: inline-flex; align-items: baseline; gap: 12px; margin-left: auto; font-size: 13px; }
-.bb-note-strip { display: flex; align-items: baseline; gap: 7px; width: 100%; font-size: 12.5px; line-height: 22px; text-align: left; white-space: nowrap; }
-.bb-note-g { flex: none; width: 12px; text-align: center; font-size: 11px; }
-.bb-note-ask { flex: 0 1 auto; max-width: 46%; overflow: hidden; text-overflow: ellipsis; }
-.bb-note-sep { flex: none; opacity: 0.5; }
-.bb-note-tail { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.bb-note-t { margin-left: 6px; }
-.bb-note.is-unread .bb-note-strip .bb-note-g, .bb-note.is-unread .bb-note-tail { color: var(--vscode-editor-foreground); }
-.bb-note.is-error .bb-note-strip .bb-note-g, .bb-note-e span { color: var(--vscode-errorForeground, #f48771); }
+/* Counts of changes, each in the colour of its sign. */
+.bb-chips { display: inline-flex; gap: 4px; vertical-align: 1px; }
+.bb-chip { padding: 0 6px; border-radius: 4px; font: 12px/20px var(--vscode-font-family, sans-serif); font-variant-numeric: tabular-nums; }
+.bb-chip.is-mod { color: var(--bb-mod); background: color-mix(in srgb, var(--bb-mod) 16%, transparent); }
+.bb-chip.is-add { color: var(--bb-add); background: color-mix(in srgb, var(--bb-add) 16%, transparent); }
+.bb-chip.is-del { color: var(--bb-del); background: color-mix(in srgb, var(--bb-del) 16%, transparent); }
 
-.bb-note-x { position: absolute; top: 0; right: 0; width: 18px; font-size: 13px; line-height: 22px; opacity: 0; transition: opacity 0.12s ease; }
-.bb-note:hover .bb-note-x, .bb-note:focus-within .bb-note-x { opacity: 1; }
-.bb-note-q { display: flex; align-items: baseline; gap: 7px; padding-right: 22px; color: var(--bb-dim); }
-.bb-note-scope { opacity: 0.7; white-space: nowrap; font: 11px var(--vscode-editor-font-family, ui-monospace, monospace); }
-.bb-note-quote, .bb-note-a, .bb-note-p, .bb-note-w, .bb-note-e { padding-left: 19px; }
-.bb-note-quote { color: var(--bb-dim); opacity: 0.8; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.bb-note-q + .bb-note-a, .bb-note-quote + .bb-note-a { margin-top: 3px; }
-.bb-note-a + .bb-note-q, .bb-note-p + .bb-note-q { margin-top: 9px; }
-.milkdown .bb-note-a p { margin: 0 0 0.45em; line-height: 1.7; }
-.milkdown .bb-note-a ul, .milkdown .bb-note-a ol { margin: 0 0 0.45em; }
-.milkdown .bb-note-a li { margin: 0.2em 0; }
-.bb-note-p, .bb-note-e { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 14px; margin-top: 2px; font-size: 12px; color: var(--bb-dim); }
-.bb-note-stat { font: 11px var(--vscode-editor-font-family, ui-monospace, monospace); }
-.bb-note-w { display: flex; align-items: center; gap: 8px; margin-top: 2px; font-size: 12px; color: var(--bb-dim); }
-.bb-note-f { display: flex; align-items: baseline; gap: 7px; margin-top: 5px; font-size: 12px; color: var(--bb-dim); }
-.bb-note-f .bb-note-meta { margin: 0 7px; }
-.bb-note-f button { font-size: 17px; line-height: 1; padding: 0 2px; }
+/* The collapsed note: one tinted band under its block. */
+.bb-note button { color: var(--bb-dim); }
+.bb-note button:hover { color: var(--bb-fg); }
+.bb-note-strip {
+    display: flex; align-items: center; gap: 10px; width: 100%; padding: 6px 12px; border-radius: 6px;
+    font-size: 13px; line-height: 20px; text-align: left; white-space: nowrap;
+    background: color-mix(in srgb, var(--bb-dim) 9%, transparent);
+}
+.bb-note.is-unread .bb-note-strip { background: color-mix(in srgb, var(--bb-acc) 12%, transparent); }
+.bb-note.is-working .bb-note-strip { background: color-mix(in srgb, var(--bb-acc) 7%, transparent); }
+.bb-note.is-error .bb-note-strip { background: color-mix(in srgb, var(--bb-err) 12%, transparent); }
+.bb-note-strip:hover { filter: brightness(1.12); }
+.bb-note-g { flex: none; width: 12px; text-align: center; font-size: 10px; color: var(--bb-dim); }
+.bb-note.is-unread .bb-note-g, .bb-note.is-working .bb-note-g { color: var(--bb-acc); }
+.bb-note.is-error .bb-note-g { color: var(--bb-err); font-size: 13px; font-weight: 700; }
+.bb-note-ask { flex: none; max-width: 42%; overflow: hidden; text-overflow: ellipsis; font-weight: 500; color: color-mix(in srgb, var(--bb-fg) 85%, transparent); }
+.bb-note.is-unread .bb-note-ask, .bb-note.is-working .bb-note-ask, .bb-note.is-error .bb-note-ask { font-weight: 600; color: var(--bb-fg); }
+.bb-note-tail { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--bb-dim); }
+.bb-note.is-unread .bb-note-tail { color: color-mix(in srgb, var(--bb-fg) 82%, transparent); }
+.bb-note.is-error .bb-note-tail { color: var(--bb-err); }
+.bb-note-strip .bb-chip { line-height: 18px; font-size: 11.5px; }
+.bb-note-step { color: var(--bb-acc); font: 12px var(--bb-mono); }
+.bb-note-meta { flex: none; font: 11px var(--bb-mono); color: var(--bb-dim); opacity: 0.8; white-space: nowrap; }
+
+/* The open note: a tinted card with the thread, the proposal's decisions and a follow-up line. */
+.bb-note-card {
+    position: relative; padding: 10px 14px; border-radius: 8px;
+    background: color-mix(in srgb, var(--bb-acc) 8%, transparent);
+}
+.bb-note.is-error .bb-note-card { background: color-mix(in srgb, var(--bb-err) 8%, transparent); }
+.bb-note-x { position: absolute; top: 10px; right: 12px; width: 18px; font-size: 13px; line-height: 22px; }
+.bb-note-q { display: flex; align-items: baseline; gap: 8px; padding-right: 26px; font-weight: 600; color: var(--bb-fg); }
+.bb-note-q > .bb-note-g { color: var(--bb-acc); font-size: 12px; font-weight: 400; }
+.bb-note-scope { font: 400 11px var(--bb-mono); color: var(--bb-dim); white-space: nowrap; }
+.bb-note-quote, .bb-note-a, .bb-note-p, .bb-note-w, .bb-note-e { padding-left: 20px; }
+.bb-note-quote { color: var(--bb-dim); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bb-note-a { color: var(--bb-fg); }
+.bb-note-q + .bb-note-a, .bb-note-quote + .bb-note-a { margin-top: 2px; }
+.bb-note-a + .bb-note-q, .bb-note-p + .bb-note-q { margin-top: 10px; }
+.bb-note-p, .bb-note-e, .bb-note-w { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin-top: 8px; font-size: 12px; color: var(--bb-dim); }
+.bb-note-stat { font: 11px var(--bb-mono); color: var(--bb-dim); }
+.bb-note-stale { color: var(--bb-err); }
+.bb-note-e > span:first-child { color: var(--bb-err); }
+.bb-note-w { color: var(--bb-acc); }
+.bb-note-ops { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; }
+.bb-note-f { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 12px; color: var(--bb-dim); }
+.bb-note-f > .bb-note-g { color: var(--bb-acc); font-size: 12px; }
+.bb-note-resolve { display: inline-grid; place-items: center; }
+.bb-note-resolve:hover { color: var(--bb-err) !important; border-color: color-mix(in srgb, var(--bb-err) 55%, transparent) !important; }
 .bb-note-fu {
     flex: 1; min-width: 0; padding: 2px 0; background: none; border: 0; outline: 0;
-    border-bottom: 1px solid transparent; color: var(--vscode-editor-foreground); font: 12px var(--vscode-font-family, sans-serif);
+    border-bottom: 1px solid color-mix(in srgb, var(--bb-fg) 14%, transparent); color: var(--bb-fg); font: 13px var(--vscode-font-family, sans-serif);
 }
-.bb-note-fu:hover { border-bottom-color: var(--bb-rule); }
 .bb-note-fu:focus { border-bottom-color: var(--vscode-focusBorder, #007acc); }
-.bb-note-meta { font: 11px var(--vscode-editor-font-family, ui-monospace, monospace); opacity: 0.7; white-space: nowrap; }
 
 /* Proposed changes, drawn over the blocks while their note is open. */
-.milkdown .bb-preview { cursor: default; }
-.bb-del { text-decoration: line-through; text-decoration-color: color-mix(in srgb, currentColor 55%, transparent); color: var(--bb-dim); background: var(--bb-del-bg); border-radius: 2px; }
-.bb-ins { background: var(--bb-ins-bg); border-radius: 2px; }
-.milkdown .bb-d-old { color: var(--bb-dim); margin-bottom: 0.35em; }
+.bb-del { text-decoration: line-through; color: var(--bb-dim); background: color-mix(in srgb, var(--bb-del) 22%, transparent); border-radius: 2px; }
+.bb-ins { color: var(--bb-fg); background: color-mix(in srgb, var(--bb-add) 26%, transparent); border-radius: 2px; }
 .bb-d-old .bb-del { text-decoration: none; }
-.milkdown .bb-d-del { color: var(--bb-dim); background: color-mix(in srgb, var(--bb-del-bg) 45%, transparent); }
-.bb-d-add > *, li.bb-d-add { background: color-mix(in srgb, var(--bb-ins-bg) 45%, transparent); }
-.milkdown .bb-d-from { color: var(--bb-dim); opacity: 0.7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bb-preview.bb-d-add, .bb-preview.bb-d-new, li.bb-d-add { background: color-mix(in srgb, var(--bb-add) 10%, transparent); }
+.bb-preview.bb-d-to { background: color-mix(in srgb, var(--bb-mod) 10%, transparent); }
 
 /* Unread count beside the Z / E toggle. */
 .bb-inbox {
     position: fixed; top: 6px; right: 40px; z-index: 50; display: inline-flex; align-items: center; gap: 5px;
-    height: 26px; padding: 0 6px; border-radius: 4px; color: var(--bb-dim);
-    font: 11px/1 var(--vscode-editor-font-family, ui-monospace, monospace); opacity: 0.6; transition: opacity 0.2s ease;
+    height: 26px; padding: 0 6px; border-radius: 4px; color: var(--bb-acc);
+    font: 11px/1 var(--bb-mono); opacity: 0.75; transition: opacity 0.2s ease;
 }
 .bb-inbox:hover { opacity: 1; background: var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, 0.15)); }
-.bb-inbox .bb-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--vscode-editor-foreground); }
-.bb-inbox b { font-weight: 500; color: var(--vscode-editor-foreground); }
+.bb-inbox .bb-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--bb-acc); }
+.bb-inbox b { font-weight: 500; color: var(--bb-fg); }
 
 /* Zen Mode: notes stay legible while typing, just quieter. */
 body.bb-mode-zen.bb-typing .bb-inbox { opacity: 0; pointer-events: none; }
-body.bb-mode-zen.bb-typing .bb-rail { opacity: 0.3; }
+body.bb-mode-zen.bb-typing .bb-rail { opacity: 0.35; }
 body.bb-mode-zen.bb-typing .bb-rail.is-unread { opacity: 0.75; }
-body.bb-mode-zen.bb-typing .bb-note.is-strip { opacity: 0.5; }
+body.bb-mode-zen.bb-typing .bb-note.is-strip { opacity: 0.55; }
 body.bb-mode-zen.bb-typing .bb-note.is-strip.is-unread { opacity: 0.85; }
 
 @media (prefers-reduced-motion: reduce) {

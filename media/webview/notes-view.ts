@@ -1,4 +1,3 @@
-import type { EditorView } from '@milkdown/kit/prose/view';
 import { lastProposalTurn, lensOn, type AiTurn, type Mark, type Note, type NoteActions, type Scope } from './notes-model';
 
 /**
@@ -16,7 +15,29 @@ import { lastProposalTurn, lensOn, type AiTurn, type Mark, type Note, type NoteA
  * A note's own line / card is a widget in the document flow (see the plugin);
  * rails, signs and controls are measured onto a layer over the editor, the
  * same way the source line numbers are.
+ *
+ * The view knows nothing about the editor engine: it reads block geometry
+ * through a NotesSurface, which each engine provides.
  */
+
+/** What the note UI needs to know about the editor, in viewport coordinates. */
+export interface NotesSurface {
+    /** The editor's root element; when its size changes, every note moves. */
+    readonly dom: HTMLElement;
+    readonly editable: boolean;
+    readonly selectionEmpty: boolean;
+    /** Start position of the top-level block under a viewport y, if any. */
+    blockAt(clientY: number): number | null;
+    /** Box of the top-level block starting at pos, with the height of its first line; null when not laid out. */
+    blockBox(pos: number): { top: number; bottom: number; line: number } | null;
+    /** Bottom of the caret. */
+    caretBottom(): number | null;
+}
+
+/** Line height of an element, for centering a sign on its first line. */
+function lineHeightOf(target: Element): number {
+    return parseFloat(getComputedStyle(target).lineHeight) || 26;
+}
 
 const SIGN_TITLE: Record<string, string> = {
     '~': '改写', '+': '新增', '−': '删除', '⤷': '从别处移到这里', '↑': '这个块移到了上方', '↓': '这个块移到了下方',
@@ -60,7 +81,7 @@ export class NotesView {
     private readonly observer: ResizeObserver;
     private readonly ticker: ReturnType<typeof setInterval>;
 
-    constructor(private view: EditorView, private readonly notes: () => Note[], private readonly actions: NoteActions) {
+    constructor(private surface: NotesSurface, private readonly notes: () => Note[], private readonly actions: NoteActions) {
         this.container = document.getElementById('editor') as HTMLElement;
         this.layer.setAttribute('aria-hidden', 'false');
         this.container.append(this.layer);
@@ -99,13 +120,12 @@ export class NotesView {
         this.container.addEventListener('mousemove', this.onMouseMove);
         this.container.addEventListener('mouseleave', this.onMouseLeave);
         this.observer = new ResizeObserver(() => this.requestMeasure());
-        this.observer.observe(view.dom);
-        const head = document.getElementById('frontmatter-panel');
-        if (head) { this.observer.observe(head); }
+        // The frontmatter panel is part of the content, so its height is covered too.
+        this.observer.observe(surface.dom);
         this.ticker = setInterval(() => this.tick(), 1000);
     }
 
-    update(view: EditorView): void { this.view = view; }
+    update(surface: NotesSurface): void { this.surface = surface; }
 
     destroy(): void {
         cancelAnimationFrame(this.frame);
@@ -122,30 +142,42 @@ export class NotesView {
     render(note: Note): void {
         const root = note.el;
         root.className = `bb-note ${note.open ? 'is-open' : 'is-strip'} is-${note.status}${note.unread ? ' is-unread' : ''}`;
-        root.replaceChildren(...(note.open ? this.card(note) : [this.strip(note)]));
+        const body = note.open ? h('div', 'bb-note-card') : this.strip(note);
+        if (note.open) { body.append(...this.card(note)); }
+        root.replaceChildren(body);
         this.refreshInbox();
         this.requestMeasure();
     }
 
-    /** Collapsed: one line — state, the question, and the first words of the answer. */
+    /**
+     * Collapsed: one tinted band — state, the question, the first words of the
+     * answer, and who answered in how long. ● unread, ○ read, ± changes to look at.
+     * (The band is itself a button, so retry lives in the expanded card.)
+     */
     private strip(note: Note): HTMLElement {
         const line = button('bb-note-strip', '', '', () => this.actions.toggle(note, true));
         const glyph = h('span', 'bb-note-g');
         const mine = note.thread.filter(turn => turn.role === 'me');
         const answer = [...note.thread].reverse().find((turn): turn is AiTurn => turn.role === 'ai');
         const tail = h('span', 'bb-note-tail');
+        let meta = '';
         if (note.status === 'working') {
             glyph.append(h('i', 'bb-ring'));
-            tail.append(h('span', 'bb-note-step', note.step), h('span', 'bb-note-t'));
+            tail.append(h('span', 'bb-note-step', note.step));
         } else if (note.status === 'error') {
             glyph.textContent = '!';
             tail.textContent = note.error;
         } else {
             const pending = note.summary?.pending.length ?? 0;
-            glyph.textContent = pending ? '±' : note.unread ? '●' : '※';
-            tail.textContent = (pending > 1 && note.summary ? `${tally(note.summary.kinds)} · ` : '') + plain(answer?.markdown ?? '').slice(0, 140);
+            glyph.textContent = pending ? '±' : note.unread ? '●' : '○';
+            if (pending > 1 && note.summary) { tail.append(tallyChips(note.summary.kinds), ' '); }
+            tail.append(plain(answer?.markdown ?? '').slice(0, 140));
+            if (answer) { meta = `${answer.agent} · ${answer.seconds}s`; }
         }
-        line.append(glyph, h('span', 'bb-note-ask', mine[mine.length - 1]?.text ?? ''), h('span', 'bb-note-sep', '—'), tail);
+        line.append(glyph, h('span', 'bb-note-ask', mine[mine.length - 1]?.text ?? ''), tail);
+        // While working, the elapsed time sits where the agent and its time will be.
+        if (note.status === 'working') { line.append(h('span', 'bb-note-meta bb-note-t')); }
+        else if (meta) { line.append(h('span', 'bb-note-meta', meta)); }
         return line;
     }
 
@@ -170,7 +202,7 @@ export class NotesView {
         if (note.status === 'working') {
             const working = h('div', 'bb-note-w');
             working.append(h('i', 'bb-ring'), h('span', 'bb-note-step', note.step), h('span', 'bb-note-t'),
-                ops(button('', '×', '取消这次提问', () => this.actions.cancel(note))));
+                ops(button('bb-btn', '×', '取消这次提问', () => this.actions.cancel(note))));
             parts.push(working);
             return parts;
         }
@@ -178,7 +210,7 @@ export class NotesView {
             const failed = h('div', 'bb-note-e');
             const reason = h('span', '', note.error);
             if (note.error === '…') { reason.title = '编辑器关闭时这句话还没有得到回答'; }
-            failed.append(reason, ops(button('', '↻', '重试', () => this.actions.retry(note))));
+            failed.append(reason, ops(button('bb-btn', '↻', '重试', () => this.actions.retry(note))));
             parts.push(failed);
         }
         const footer = h('div', 'bb-note-f');
@@ -194,7 +226,10 @@ export class NotesView {
         // A new line that starts with ※, like every question above it: type here to follow up.
         footer.append(h('span', 'bb-note-g', '※'), followUp);
         if (answered) { footer.append(h('span', 'bb-note-meta', `${answered.agent} · ${answered.seconds}s`)); }
-        footer.append(button('', '∎', '了结这条旁注，从文档旁移除', () => this.actions.resolve(note)));
+        const resolve = button('bb-btn bb-note-resolve', '', '了结这条旁注，从文档旁移除', () => this.actions.resolve(note));
+        resolve.setAttribute('aria-label', '了结这条旁注');
+        resolve.append(trashIcon());
+        footer.append(resolve);
         parts.push(footer);
         return parts;
     }
@@ -206,7 +241,9 @@ export class NotesView {
         if (!summary) { return bar; }
         const multi = summary.total > 1;
         if (summary.pending.length) {
-            const stat = h('span', 'bb-note-stat', summary.chars && !multi ? `−${summary.chars.del} +${summary.chars.ins}` : tally(summary.kinds));
+            const stat = summary.chars && !multi
+                ? chips([['−', summary.chars.del, 'del'], ['+', summary.chars.ins, 'add']])
+                : tallyChips(summary.kinds);
             stat.title = summary.chars && !multi ? '删去和新增的字数' : '待处理的改动：~ 改写 · + 新增 · − 删除 · ⤷ 移动';
             bar.append(stat);
         }
@@ -221,14 +258,14 @@ export class NotesView {
             bar.append(stale);
         }
         if (summary.pending.length && !note.lens) {
-            bar.append(ops(button('', '±', '把改动标在原文上', () => this.actions.showChanges(note))));
+            bar.append(ops(button('bb-btn', '±', '把改动标在原文上', () => this.actions.showChanges(note))));
         } else if (summary.pending.length) {
             bar.append(ops(
-                button('', '✓', `${multi ? '全部接受' : '接受'}（可用 ⌘Z 撤销）`, () => this.actions.accept(note)),
-                button('', '×', multi ? '全部放弃' : '放弃', () => this.actions.reject(note)),
+                button('bb-btn is-yes', '✓', `${multi ? '全部接受' : '接受'}（可用 ⌘Z 撤销）`, () => this.actions.accept(note)),
+                button('bb-btn', '×', multi ? '全部放弃' : '放弃', () => this.actions.reject(note)),
             ));
         } else if (summary.rejected) {
-            bar.append(ops(button('', '↺', '重新显示放弃的改动', () => this.actions.review(note))));
+            bar.append(ops(button('bb-btn', '↺', '重新显示放弃的改动', () => this.actions.review(note))));
         }
         return bar;
     }
@@ -248,7 +285,7 @@ export class NotesView {
     private tick(): void {
         for (const note of this.notes()) {
             const elapsed = note.status === 'working' ? note.el.querySelector('.bb-note-t') : null;
-            if (elapsed) { elapsed.textContent = `· ${Math.max(0, Math.round((Date.now() - note.startedAt) / 1000))}s`; }
+            if (elapsed) { elapsed.textContent = `${Math.max(0, Math.round((Date.now() - note.startedAt) / 1000))}s`; }
         }
     }
 
@@ -312,32 +349,19 @@ export class NotesView {
         if (this.hoverPos !== null) { this.hoverPos = null; this.requestMeasure(); }
     };
 
-    /** Start position of the top-level block under a viewport y, if any. */
-    private blockAt(y: number): number | null {
-        for (const child of Array.from(this.view.dom.children)) {
-            if (!(child instanceof HTMLElement) || child.classList.contains('bb-note') || child.classList.contains('bb-preview')) { continue; }
-            const rect = child.getBoundingClientRect();
-            if (y < rect.top || y > rect.bottom) { continue; }
-            try {
-                const $pos = this.view.state.doc.resolve(this.view.posAtDOM(child, 0));
-                return $pos.depth ? $pos.before(1) : $pos.pos;
-            } catch { return null; }
-        }
-        return null;
-    }
+    private blockAt(y: number): number | null { return this.surface.blockAt(y); }
 
     private measure(): void {
         const base = this.container.getBoundingClientRect().top - this.container.scrollTop;
-        const box = (target: Element): { top: number; bottom: number } => {
+        type Box = { top: number; bottom: number; line: number };
+        const box = (target: Element): Box => {
             const rect = target.getBoundingClientRect();
-            return { top: rect.top - base, bottom: rect.bottom - base };
-        };
-        const block = (pos: number): HTMLElement | null => {
-            try { const dom = this.view.nodeDOM(pos); return dom instanceof HTMLElement && dom.isConnected ? dom : null; } catch { return null; }
-        };
-        const firstLine = (target: HTMLElement): number => {
             const inner = target.classList.contains('bb-preview') && target.firstElementChild ? target.firstElementChild : target;
-            return parseFloat(getComputedStyle(inner).lineHeight) || 26;
+            return { top: rect.top - base, bottom: rect.bottom - base, line: lineHeightOf(inner) };
+        };
+        const block = (pos: number): Box | null => {
+            const found = this.surface.blockBox(pos);
+            return found && { top: found.top - base, bottom: found.bottom - base, line: found.line };
         };
         const place = (target: HTMLElement, top: number, bottom: number): void => {
             target.style.top = `${top}px`;
@@ -355,12 +379,13 @@ export class NotesView {
                 this.layer.append(rail);
             }
             const first = block(note.from), last = block(note.last);
-            const card = note.el.isConnected ? box(note.el) : null;
+            // The visible band or card, without the spacing below it.
+            const card = note.el.isConnected ? box(note.el.firstElementChild ?? note.el) : null;
             rail.hidden = !first || !last;
             if (!first || !last) { continue; }
             // With the changes shown, each changed block carries its own coloured bar; the rail keeps to the card.
             const lens = lensOn(note) && card;
-            place(rail, lens ? card.top - 2 : box(first).top, lens ? card.bottom + 2 : Math.max(box(last).bottom, card ? card.bottom + 2 : 0));
+            place(rail, lens ? card.top - 2 : first.top, lens ? card.bottom + 2 : Math.max(last.bottom, card ? card.bottom + 2 : 0));
             rail.className = `bb-rail is-${note.status}${note.unread ? ' is-unread' : ''}${note.open ? ' is-open' : ''}`;
             const question = note.thread.find(turn => turn.role === 'me');
             rail.title = (question?.role === 'me' ? question.text : '') + (note.status === 'working' ? '（处理中）' : note.unread ? '（未读）' : '');
@@ -370,8 +395,8 @@ export class NotesView {
         // Signs on the left, accept / reject on the right, for every changed block on show.
         const used = new Set<string>();
         for (const mark of this.marks) {
-            const target = mark.el ?? (mark.pos === undefined ? null : block(mark.pos));
-            if (!target || !target.isConnected) { continue; }
+            const rect = mark.el ? (mark.el.isConnected ? box(mark.el) : null) : mark.pos === undefined ? null : block(mark.pos);
+            if (!rect) { continue; }
             used.add(mark.key);
             let els = this.markEls.get(mark.key);
             if (!els) {
@@ -386,14 +411,14 @@ export class NotesView {
                     const item = mark.item;
                     els.controls = h('span', 'bb-ops');
                     els.controls.append(
-                        button('', '✓', '接受这一处', () => this.actions.accept(mark.note, item)),
-                        button('', '×', '放弃这一处', () => this.actions.reject(mark.note, item)),
+                        button('bb-btn is-yes', '✓', '接受这一处', () => this.actions.accept(mark.note, item)),
+                        button('bb-btn', '×', '放弃这一处', () => this.actions.reject(mark.note, item)),
                     );
                     this.layer.append(els.controls);
                 }
                 this.markEls.set(mark.key, els);
             }
-            const rect = box(target), line = rect.top + (firstLine(target) - 18) / 2;
+            const line = rect.top + (rect.line - 18) / 2;
             if (els.sign) { els.sign.style.top = `${line}px`; }
             if (els.bar) { place(els.bar, rect.top + 4, Math.max(rect.top + 10, rect.bottom - 4)); }
             if (els.controls) { els.controls.style.top = `${line}px`; }
@@ -409,9 +434,9 @@ export class NotesView {
         if (this.ask) {
             const first = block(this.ask.from), last = block(this.ask.last);
             if (first && last) {
-                place(this.askRail, box(first).top, box(last).bottom);
-                const head = this.view.state.selection.empty && this.ask.kind === 'block'
-                    ? this.caretBottom() ?? box(last).bottom : box(this.ask.kind === 'section' ? first : last).bottom;
+                place(this.askRail, first.top, last.bottom);
+                const head = this.surface.selectionEmpty && this.ask.kind === 'block'
+                    ? this.caretBottom() ?? last.bottom : (this.ask.kind === 'section' ? first : last).bottom;
                 this.askBox.style.top = `${head + 8}px`;
             } else { this.closeAsk(false); }
         }
@@ -419,16 +444,33 @@ export class NotesView {
         // Hovering a block that has no note yet: a faint ※ to ask by mouse.
         const hovered = this.hoverPos !== null && !this.ask ? block(this.hoverPos) : null;
         const taken = hovered !== null && this.notes().some(note => this.hoverPos! >= note.from && this.hoverPos! <= note.last);
-        this.ghost.hidden = !hovered || taken || !this.view.editable;
-        if (hovered && !taken) { this.ghost.style.top = `${box(hovered).top + (firstLine(hovered) - 18) / 2}px`; }
+        this.ghost.hidden = !hovered || taken || !this.surface.editable;
+        if (hovered && !taken) { this.ghost.style.top = `${hovered.top + (hovered.line - 18) / 2}px`; }
     }
 
     private caretBottom(): number | null {
         try {
             const base = this.container.getBoundingClientRect().top - this.container.scrollTop;
-            return this.view.coordsAtPos(this.view.state.selection.head).bottom - base;
+            const bottom = this.surface.caretBottom();
+            return bottom === null ? null : bottom - base;
         } catch { return null; }
     }
+}
+
+/** A wastebasket drawn in the text colour (no emoji: it would come in colour and out of style). */
+function trashIcon(): SVGSVGElement {
+    const ns = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(ns, 'svg');
+    for (const [name, value] of Object.entries({
+        viewBox: '0 0 16 16', width: '14', height: '14', fill: 'none', stroke: 'currentColor',
+        'stroke-width': '1.3', 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'aria-hidden': 'true',
+    })) { svg.setAttribute(name, value); }
+    for (const d of ['M2.5 4h11', 'M6 4V2.5h4V4', 'M3.8 4l.7 9.2c.05.7.6 1.3 1.3 1.3h4.4c.7 0 1.25-.6 1.3-1.3l.7-9.2', 'M6.6 6.8v4.9M9.4 6.8v4.9']) {
+        const path = document.createElementNS(ns, 'path');
+        path.setAttribute('d', d);
+        svg.append(path);
+    }
+    return svg;
 }
 
 /** Buttons gathered at the right end of a row. */
@@ -438,8 +480,15 @@ function ops(...buttons: HTMLElement[]): HTMLElement {
     return group;
 }
 
-/** Pending changes counted in the same signs that mark them in the gutter: "~2 +1 −1 ⤷1". */
-function tally(kinds: { mod: number; add: number; del: number; move: number }): string {
-    return ([['~', kinds.mod], ['+', kinds.add], ['−', kinds.del], ['⤷', kinds.move]] as const)
-        .filter(([, count]) => count).map(([sign, count]) => `${sign}${count}`).join(' ');
+/** Counts as small chips, each in the colour of its sign in the gutter. */
+function chips(items: Array<[string, number, 'mod' | 'add' | 'del']>): HTMLElement {
+    const group = h('span', 'bb-chips');
+    for (const [sign, count, tone] of items) { if (count) { group.append(h('span', `bb-chip is-${tone}`, `${sign}${count}`)); } }
+    return group;
 }
+
+/** Pending changes counted in the same signs that mark them in the gutter: ~2 +1 −1 ⤷1. */
+function tallyChips(kinds: { mod: number; add: number; del: number; move: number }): HTMLElement {
+    return chips([['~', kinds.mod, 'mod'], ['+', kinds.add, 'add'], ['−', kinds.del, 'del'], ['⤷', kinds.move, 'mod']]);
+}
+

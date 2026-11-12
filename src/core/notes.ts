@@ -15,6 +15,8 @@ export interface NoteRequest {
     history: NoteTurnWire[];
     /** The document on disk; absent for an unsaved document. */
     filePath?: string;
+    /** The editor holds changes not yet saved, so the file on disk may be behind. */
+    unsavedChanges?: boolean;
     /** Folder the agent may read from. */
     cwd: string;
 }
@@ -42,9 +44,11 @@ export function buildNotePrompt(request: NoteRequest): string {
     const lines: string[] = [
         '你在协助一位正在写 Markdown 文档的写作者。写作者没有离开编辑器，只是在文档旁给你留了一句话；你的回答会显示在那段文字下方的窄栏里，写作者稍后才看。',
         '',
-        request.filePath
-            ? `文档：${request.filePath}（需要上下文时用读文件工具读全文）`
-            : '文档还没有保存到磁盘，下面的范围就是你能看到的全部内容。',
+        !request.filePath
+            ? '文档还没有保存到磁盘，下面的范围就是你能看到的全部内容。'
+            : request.unsavedChanges
+                ? `文档：${request.filePath}（需要上下文时用读文件工具读全文；编辑器里有还没保存的修改，磁盘上的版本可能较旧，下面的范围以编辑器为准）`
+                : `文档：${request.filePath}（需要上下文时用读文件工具读全文）`,
         `这句话针对的范围是${SCOPE_NAME[request.scopeKind]}，Markdown 原文如下：`,
         '<bb-scope>',
         request.scopeMarkdown.trim(),

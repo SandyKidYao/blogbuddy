@@ -61,14 +61,12 @@ async function main() {
 		],
 	});
 
+	const contexts = [extensionCtx, webviewCtx];
 	if (watch) {
-		await extensionCtx.watch();
-		await webviewCtx.watch();
+		await Promise.all(contexts.map(ctx => ctx.watch()));
 	} else {
-		await extensionCtx.rebuild();
-		await webviewCtx.rebuild();
-		await extensionCtx.dispose();
-		await webviewCtx.dispose();
+		await Promise.all(contexts.map(ctx => ctx.rebuild()));
+		await Promise.all(contexts.map(ctx => ctx.dispose()));
 	}
 }
 

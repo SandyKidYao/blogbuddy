@@ -1,4 +1,3 @@
-import type { Node } from '@milkdown/kit/prose/model';
 import type { BlockInfo, SeqItem } from '../../src/core/blockDiff';
 import type { NoteScopeKind } from '../../src/services/webviewProtocol';
 
@@ -16,8 +15,7 @@ export interface Proposal {
     replacement: string;
     /** Block operations in reading order, each with the writer's decision so far. */
     seq: SeqItem[];
-    /** Parsed `replacement` (not persisted; rebuilt on load). */
-    nodes: Node[];
+    /** The rewrite's blocks; a block's `text` is its Markdown. */
     target: BlockInfo[];
 }
 

@@ -1,3 +1,10 @@
+import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands';
+import { yaml as yamlLanguage } from '@codemirror/lang-yaml';
+import { indentUnit, LanguageSupport, StreamLanguage, syntaxHighlighting } from '@codemirror/language';
+import { toml } from '@codemirror/legacy-modes/mode/toml';
+import { Annotation, Compartment, EditorState } from '@codemirror/state';
+import { EditorView, keymap } from '@codemirror/view';
+import { classHighlighter } from '@lezer/highlight';
 import yaml from 'js-yaml';
 
 // Frontmatter is shown as the document's own head: real keys, values edited in
@@ -37,6 +44,8 @@ let fenced: Fenced | null = null;
 let data: Record<string, unknown> | null = null;
 let sourceMode = false;
 let changeListener: (() => void) | null = null;
+/** A change from outside arrived while the writer was in a field; redraw when they leave. */
+let staleFields = false;
 
 // ---- Parse / serialize ----
 
@@ -105,7 +114,7 @@ function writeField(key: string, value: unknown): void {
     else { lines.push(...next); }
     fenced = { ...fenced, body: lines.join(fenced.nl) };
     raw = joinFenced(fenced);
-    syncTextarea();
+    syncSource();
     renderSummary();
     changeListener?.();
 }
@@ -264,13 +273,94 @@ function control(key: string, value: unknown): HTMLElement {
     }
 }
 
+// ---- The panel's DOM (it is the document's head, inside the editor) ----
+
+interface Parts {
+    root: HTMLElement;
+    toggle: HTMLButtonElement;
+    fence: HTMLElement;
+    summary: HTMLElement;
+    source: HTMLButtonElement;
+    props: HTMLElement;
+    /** The raw frontmatter, in a small code editor of its own (YAML or TOML highlighting). */
+    sourceView: EditorView;
+    close: HTMLElement;
+}
+let parts: Parts | undefined;
+
+function make<K extends keyof HTMLElementTagNameMap>(tag: K, className: string, attrs: Record<string, string> = {}, text = ''): HTMLElementTagNameMap[K] {
+    const element = document.createElement(tag);
+    element.className = className;
+    for (const [name, value] of Object.entries(attrs)) { element.setAttribute(name, value); }
+    if (text) { element.textContent = text; }
+    return element;
+}
+
+function build(): Parts {
+    const root = make('section', 'fm fm-collapsed', { id: 'frontmatter-panel', 'aria-label': '文档属性' });
+    root.hidden = true;
+    const toggle = make('button', 'fm-toggle', { id: 'frontmatter-toggle', type: 'button', 'aria-expanded': 'false', title: '展开 / 收起属性' });
+    const fence = make('span', 'fm-fence', { id: 'frontmatter-fence' }, '---');
+    const summary = make('span', 'fm-summary', { id: 'frontmatter-summary' });
+    toggle.append(fence, summary);
+    const source = make('button', 'fm-source-toggle', { id: 'frontmatter-source', type: 'button', 'aria-pressed': 'false', title: '编辑源码' }, '{ }');
+    const head = make('div', 'fm-head');
+    head.append(toggle, source);
+    const props = make('dl', 'fm-props', { id: 'frontmatter-props' });
+    const sourceBox = make('div', 'fm-raw', { id: 'frontmatter-editor' });
+    const sourceView = new EditorView({
+        parent: sourceBox,
+        state: EditorState.create({
+            extensions: [
+                sourceLanguage.of(yamlLanguage()),
+                syntaxHighlighting(classHighlighter),
+                history(),
+                indentUnit.of('  '),
+                EditorView.lineWrapping,
+                // Tab indents here; Esc then Tab leaves the editor (CodeMirror's convention).
+                keymap.of([indentWithTab, ...historyKeymap, ...defaultKeymap]),
+                EditorView.contentAttributes.of({ 'aria-label': '属性源码', spellcheck: 'false' }),
+                EditorView.updateListener.of(update => {
+                    if (update.docChanged && !update.transactions.some(tr => tr.annotation(fromDocument))) {
+                        sourceEdited(update.state.doc.toString());
+                    }
+                }),
+            ],
+        }),
+    });
+    const close = make('div', 'fm-fence fm-close', { 'aria-hidden': 'true' }, '---');
+    const body = make('div', 'fm-body');
+    body.append(props, sourceBox, close);
+    root.append(head, body);
+    return { root, toggle, fence, summary, source, props, sourceView, close };
+}
+
+/** YAML for --- fences, TOML for +++. */
+const sourceLanguage = new Compartment();
+const tomlLanguage = new LanguageSupport(StreamLanguage.define(toml));
+/** Marks the source editor's text being set from the document, so it is not written back. */
+const fromDocument = Annotation.define<boolean>();
+
+/** The writer typed in the source editor: the frontmatter becomes what it says. */
+function sourceEdited(text: string): void {
+    if (fenced) {
+        const body = text.replace(/\r?\n/g, fenced.nl);
+        fenced = { ...fenced, body };
+        // Clearing the source removes the frontmatter block entirely.
+        raw = body.trim() === '' ? '' : joinFenced(fenced);
+    } else {
+        raw = text;
+    }
+    data = parseBody(fenced);
+    renderSummary();
+    changeListener?.();
+}
+
 // ---- Rendering ----
 
-function el(id: string): HTMLElement | null { return document.getElementById(id); }
-
 function renderProps(): void {
-    const props = el('frontmatter-props');
-    if (!props) { return; }
+    if (!parts) { return; }
+    const { props } = parts;
     props.replaceChildren();
 
     if (!data) {
@@ -333,7 +423,7 @@ function addFieldRow(): HTMLElement {
             if (!(key in data)) { writeField(key, defaultValue(key)); }
             done = true; // re-rendering detaches this input and fires blur
             renderProps();
-            const target = [...document.querySelectorAll('#frontmatter-props dt')].find(dt => dt.textContent === key);
+            const target = [...(parts?.props.querySelectorAll('dt') ?? [])].find(dt => dt.textContent === key);
             target?.nextElementSibling?.querySelector<HTMLElement>('input, textarea, button')?.focus();
         });
         input.addEventListener('blur', close);
@@ -345,8 +435,8 @@ function addFieldRow(): HTMLElement {
 }
 
 function renderSummary(): void {
-    const summary = el('frontmatter-summary');
-    if (!summary) { return; }
+    if (!parts) { return; }
+    const { summary } = parts;
     summary.replaceChildren();
     const add = (text: string, className?: string): void => {
         const span = document.createElement('span');
@@ -368,27 +458,32 @@ function renderSummary(): void {
     }
 }
 
-function syncTextarea(): void {
-    const textarea = el('frontmatter-editor') as HTMLTextAreaElement | null;
-    if (!textarea) { return; }
-    textarea.value = fenced ? fenced.body : raw;
-    if (sourceMode) { autoGrow(textarea); }
+/** Show the frontmatter's text in the source editor (without writing it back). */
+function syncSource(): void {
+    if (!parts) { return; }
+    const view = parts.sourceView;
+    const text = fenced ? fenced.body : raw;
+    const changes = view.state.doc.toString() === text ? undefined : { from: 0, to: view.state.doc.length, insert: text };
+    view.dispatch({
+        changes,
+        effects: sourceLanguage.reconfigure(fenced?.fence === '+++' ? tomlLanguage : yamlLanguage()),
+        annotations: fromDocument.of(true),
+    });
 }
 
 function setCollapsed(collapsed: boolean): void {
-    const panel = el('frontmatter-panel');
-    panel?.classList.toggle('fm-collapsed', collapsed);
-    el('frontmatter-toggle')?.setAttribute('aria-expanded', String(!collapsed));
+    parts?.root.classList.toggle('fm-collapsed', collapsed);
+    parts?.toggle.setAttribute('aria-expanded', String(!collapsed));
 }
 
 function setSourceMode(on: boolean): void {
     sourceMode = on;
-    el('frontmatter-panel')?.classList.toggle('fm-source', on);
-    el('frontmatter-source')?.setAttribute('aria-pressed', String(on));
+    parts?.root.classList.toggle('fm-source', on);
+    parts?.source.setAttribute('aria-pressed', String(on));
     setCollapsed(false);
     if (on) {
-        const textarea = el('frontmatter-editor') as HTMLTextAreaElement | null;
-        if (textarea) { syncTextarea(); textarea.focus(); }
+        syncSource();
+        parts?.sourceView.focus();
     } else {
         renderProps();
     }
@@ -396,51 +491,52 @@ function setSourceMode(on: boolean): void {
 
 // ---- Public API ----
 
-export function initFrontmatterPanel(): void {
-    const toggle = el('frontmatter-toggle');
-    const source = el('frontmatter-source');
-    const textarea = el('frontmatter-editor') as HTMLTextAreaElement | null;
-    if (!toggle || !source || !textarea) { return; }
+/** The panel, built on first use; the editor shows it in place of the frontmatter. */
+export function frontmatterPanel(): HTMLElement {
+    if (parts) { return parts.root; }
+    parts = build();
+    const { root, toggle, source } = parts;
 
     toggle.addEventListener('click', () => {
-        const collapsed = el('frontmatter-panel')?.classList.contains('fm-collapsed') ?? true;
+        const collapsed = root.classList.contains('fm-collapsed');
         if (collapsed && !data) { setSourceMode(true); return; }
         setCollapsed(!collapsed);
     });
     source.addEventListener('click', () => setSourceMode(!sourceMode));
-
-    textarea.addEventListener('input', () => {
-        autoGrow(textarea);
-        if (fenced) {
-            const body = textarea.value.replace(/\r?\n/g, fenced.nl);
-            fenced = { ...fenced, body };
-            // Clearing the source removes the frontmatter block entirely.
-            raw = body.trim() === '' ? '' : joinFenced(fenced);
-        } else {
-            raw = textarea.value;
-        }
-        data = parseBody(fenced);
-        renderSummary();
-        changeListener?.();
+    root.addEventListener('focusout', event => {
+        if (!staleFields || root.contains(event.relatedTarget as Node | null)) { return; }
+        staleFields = false;
+        syncSource();
+        renderProps();
     });
+
+    return root;
 }
 
-export function updateFrontmatterPanel(frontmatter: string): void {
-    const panel = el('frontmatter-panel');
-    if (!panel) { return; }
+/**
+ * Show the document's frontmatter. On load the panel starts collapsed; with
+ * `keepView` (a change from outside the panel — undo, another editor) it keeps
+ * its state, and leaves the fields alone while the writer is typing in one.
+ */
+export function updateFrontmatterPanel(frontmatter: string, keepView = false): void {
+    const panel = frontmatterPanel();
+    const { fence, source, close } = parts!;
     raw = frontmatter || '';
     fenced = splitFenced(raw);
     data = parseBody(fenced);
     panel.hidden = !raw;
+    fence.textContent = close.textContent = fenced?.fence ?? '---';
+    if (keepView) {
+        renderSummary();
+        if (panel.contains(document.activeElement)) { staleFields = true; } else { syncSource(); renderProps(); }
+        return;
+    }
     // Collapsed on every load: frontmatter is reached for on purpose.
     sourceMode = false;
     panel.classList.remove('fm-source');
-    el('frontmatter-source')?.setAttribute('aria-pressed', 'false');
-    const fence = el('frontmatter-fence');
-    if (fence) { fence.textContent = fenced?.fence ?? '---'; }
-    panel.querySelectorAll('.fm-close').forEach(close => { close.textContent = fenced?.fence ?? '---'; });
+    source.setAttribute('aria-pressed', 'false');
     setCollapsed(true);
-    syncTextarea();
+    syncSource();
     renderSummary();
     renderProps();
 }

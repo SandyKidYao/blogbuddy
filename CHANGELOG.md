@@ -4,6 +4,23 @@ All notable changes to the "blogbuddy" extension will be documented in this file
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## [0.2.0] - 2026-11-12
+
+### Changed
+
+- **BB Editor is built on CodeMirror 6** instead of Milkdown. The text you edit is the file's Markdown, shown as live preview: marks are hidden and the text styled, except on the line being edited, where they reappear faintly. Tables render until you click into them; task boxes can be ticked; code blocks are highlighted by the language after the fence.
+- **BB Editor edits VS Code's document for the file** (a custom text editor). Saving, the unsaved dot, Save As, Revert and hot exit are VS Code's own; a text editor open on the same file stays in step with BB Editor as either one is typed in; changes on disk arrive as edits to just the lines that changed, so the caret, undo history and margin notes stay where they were.
+- Saves never rewrite untouched text — there is no conversion between the editor and the file.
+- **Saving follows VS Code's `files.autoSave` setting.** BB Editor no longer saves on its own a moment after typing, nor before asking a margin note (the agent is told when the file on disk is behind the editor); `Cmd+S` saves.
+- `Cmd+Shift+B` swaps BB Editor and the text editor in place, like Reopen Editor With: unsaved changes go along, nothing is saved.
+- The frontmatter is part of the document again (line numbers count it); it is still shown and edited as the properties head, and ordinary typing cannot reach into it. Its source view is now a small code editor with YAML (or TOML) highlighting, Tab indenting and its own undo.
+- `Cmd+F` searches the whole document with the editor's own find bar.
+- **Margin notes are easier to see.** A note is a tinted band under its block, its colour its state — amber unread or working, grey read, red failed — with the question in bold and the answer in text colour; the rail beside its blocks takes the same colour. An open note is a tinted card; pending changes are counted in coloured chips (`~1 +1 −1`), and accept / reject are bordered buttons, accept in green.
+
+### Removed
+
+- The external-change banner, the draft-recovery tab and BB Editor's own file watching and conflict handling — VS Code handles these for its documents.
+
 ## [0.1.0] - 2026-11-10
 
 A change of direction: BlogBuddy is now BB Editor plus **margin notes**. The inline `<bb-*>` tags and the API-key setup are gone; AI help comes from the agent CLI you already use, working beside the text instead of inside it.

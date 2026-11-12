@@ -79,22 +79,22 @@ When you ask for changes ("tighten this", "fix typos", "reorganise this section"
 
 ---
 
-## BB Editor — a WYSIWYG that respects Markdown
+## BB Editor — live preview over your Markdown
 
-A rich-text editor for `.md` files, powered by [Milkdown](https://milkdown.dev). Open it with `Cmd+Shift+B` / `Ctrl+Shift+B` — on a `.md` file in the Explorer, or with a `.md` already open in VS Code's text editor to swap it for BB Editor in place. The same chord switches back to the Markdown source.
+An editor for `.md` files, built on [CodeMirror 6](https://codemirror.net). What you edit is the file's own text: Markdown's marks are hidden and the text is styled, except on the line you are editing, where the marks come back (faintly) so you can change them directly. Open it with `Cmd+Shift+B` / `Ctrl+Shift+B` — on a `.md` file in the Explorer, or with a `.md` already open in VS Code's text editor to swap it for BB Editor in place. The same chord switches back to the Markdown source.
 
-- **WYSIWYG with full GFM** — tables, strikethrough, task lists, autolinks, blockquotes, fenced code
-- **Slash menu (`/`)** — block types
+- **Live preview with GFM** — headings, emphasis, links, lists, task lists (click a box to tick it), quotes, rules, images, fenced code; tables render as tables until you click into them
+- **The file is the document** — BB Editor edits VS Code's own document for the file. Nothing is rewritten on save; the unsaved dot, Save / Save As, Revert and hot exit work as in any editor; changes made on disk, by another extension, or in a text editor showing the same file appear as you type, and yours appear there
+- **Slash menu (`/`)** — block types, written as Markdown
 - **Frontmatter head** — the file's own `---` fences, with `title` · `date` · `tags` · `categories` · `author` · `slug` · `draft` · `description` edited in place; raw YAML one click away
-- **Source line numbers** — each block shows its line in the underlying `.md`
-- **Prism syntax highlighting** — 20+ languages; palette tracks VS Code light / dark / high-contrast themes
-- **IME-safe** — CJK composition never leaks into auto-save
+- **Source line numbers** — the file's line numbers beside the text
+- **Code highlighting** — by the language named after the fence (JS/TS, Python, Go, Rust, Java, C/C++, SQL, YAML, JSON, HTML/CSS, Shell, Diff, TOML …); colours follow VS Code's light / dark theme
+- **Find (`Cmd+F`)** — across the whole document
+- **IME-safe** — CJK composition reaches the document only once it is committed
 - **Arrow ligatures** — `->` → `→`, `=>` → `⇒` outside code and IME
-- **Quiet saves** — blocks you did not edit keep their original bytes, so Git diffs stay small
-- **External-change banner** — if the file changes on disk while you have unsaved edits, choose Reload or Keep
-- **Paste-to-disk assets** — images and files dropped into the canvas are written next to the document (or under `blogbuddy.assetDir`) and inserted as relative paths
+- **Paste-to-disk assets** — images and files dropped into the editor are written next to the document (or under `blogbuddy.assetDir`) and inserted as relative paths
 - **Zen / Editor mode** — the small `Z` / `E` button at the top-right. Zen is a centered, distraction-free column whose chrome fades while you type; Editor is full width with line numbers and the frontmatter head
-- **Auto-save**, with `Cmd+S` to flush
+- **Saving is VS Code's** — with `files.autoSave` on, your edits are saved like any other file's; with it off they wait for `Cmd+S` (which asks for a name for an untitled document). Switching between BB Editor and the text editor (`Cmd+Shift+B`) happens in place and carries unsaved changes along
 
 ---
 

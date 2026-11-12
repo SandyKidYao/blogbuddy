@@ -1,7 +1,7 @@
 # BlogBuddy Development Guidelines for Claude
 
 ## Project Identity & Mission
-This is a VS Code extension with two parts: BB Editor, a WYSIWYG Markdown editor, and margin notes (旁注) — a sentence the writer leaves beside a block, answered in the background by the agent CLI they already use (Claude Code or Codex). The core philosophy is maintaining user flow without context switching: the document is the main thing, conversations hang off its blocks, and nothing interrupts the writer.
+This is a VS Code extension with two parts: BB Editor, a live-preview Markdown editor, and margin notes (旁注) — a sentence the writer leaves beside a block, answered in the background by the agent CLI they already use (Claude Code or Codex). The core philosophy is maintaining user flow without context switching: the document is the main thing, conversations hang off its blocks, and nothing interrupts the writer.
 
 ## Core Architecture
 
@@ -26,7 +26,7 @@ This is a VS Code extension with two parts: BB Editor, a WYSIWYG Markdown editor
 ```
 src/
 ├── commands/          # View Layer: Platform integration & UI
-│   ├── editorCommand.ts   # BB Editor webview panel lifecycle & HTML
+│   ├── editorCommand.ts   # BB Editor: custom text editor provider, open / open-source commands, HTML
 │   └── ...
 ├── core/             # Business Layer
 │   ├── notes.ts             # Margin-note prompt, reply contract, NoteAssistant
@@ -35,17 +35,25 @@ src/
 │   ├── AgentService.ts      # The single door to AI: runs the agent CLI headless and read-only
 │   ├── agentProtocol.ts     # CLI arguments and output parsing per agent (pure)
 │   ├── NoteStore.ts         # Notes per document, in extension storage
-│   ├── WebviewBridge.ts     # Webview ↔ Extension Host message routing
+│   ├── WebviewBridge.ts     # One editor's webview ↔ its TextDocument: sync, notes, uploads
+│   ├── textSync.ts          # Document sync core (pure): positions, CRLF, versions, echo of own pushes
 │   └── webviewProtocol.ts   # Typed message protocol definitions
 └── utils/            # Foundation Layer: Utilities
 
-media/webview/         # Webview frontend (browser, bundled separately)
-├── index.ts              # Milkdown editor init, message handling, URI conversion
-├── notes-plugin.ts       # Margin notes: positions, decorations, applying proposals
-├── notes-view.ts         # Margin notes: summary line / card, gutters, ask box
-├── notes-model.ts        # Margin-note types shared by the two above
-├── bb-slash-plugin.ts    # Slash menu (block types)
-└── styles.css            # Editor styles
+media/webview/         # Webview frontend (browser, bundled separately) — CodeMirror 6
+├── index.ts              # Editor setup, host messages, keys, stats
+├── sync.ts               # Webview side of document sync (@codemirror/collab client)
+├── live-preview.ts       # Markdown shown as styled text; marks back on the caret's line; tables
+├── frontmatter.ts        # Frontmatter node, the panel as the document's head, edit guard
+├── frontmatter-panel.ts  # Properties panel (fields / raw YAML); builds its own DOM
+├── blocks.ts             # Top-level Markdown blocks (the unit of notes and proposals)
+├── notes.ts              # Margin notes: positions, decorations, applying proposals, diff highlighting
+├── notes-view.ts         # Margin notes: summary line / card, gutters, ask box (engine-agnostic)
+├── notes-model.ts        # Margin-note types
+├── md-render.ts          # Markdown → DOM for tables, answers and proposed blocks
+├── commands.ts / slash.ts / upload.ts / line-numbers.ts / code-languages.ts
+├── styles.css            # Layout, frontmatter, notes, notices
+└── editor.css            # The editor's typography
 ```
 
 ### Layer Interaction Rules
@@ -55,7 +63,7 @@ media/webview/         # Webview frontend (browser, bundled separately)
 
 ### BB Editor (Webview) Architecture
 
-The BB Editor is a WYSIWYG Markdown editor running inside a VS Code webview panel.
+BB Editor is a CodeMirror 6 live-preview Markdown editor in a webview, registered as a custom text editor (`blogbuddy.editor`, priority `option`) over VS Code's TextDocument.
 
 **Dual build system** (`esbuild.js`):
 
@@ -66,31 +74,35 @@ The BB Editor is a WYSIWYG Markdown editor running inside a VS Code webview pane
 
 ```text
 Webview (browser)              Extension Host (Node.js)
-  index.ts                       WebviewBridge.ts
+  index.ts / sync.ts             WebviewBridge.ts ──── TextDocument (the authority)
+    │                                │
+    │← init (text, version, epoch)─│   on ready (with the notes kept for it), and after the two sides lose track
+    │── push (collab updates) ─────→ │ → SyncLog.accept → WorkspaceEdit
+    │← updates (numbered) ─────────│ ← onDidChangeTextDocument (anyone's change)
+    │← push-result ────────────────│
+    │── save ──────────────────────→ │ → workbench.action.files.save
     │                                │
     │── note-ask (scope Markdown) ─→ │ → NoteAssistant.ask() → AgentService
     │← note-progress / done / error│   (the host never edits the document)
     │── notes-save ────────────────→ │ → NoteStore (extension storage)
-    │← notes-load ─────────────────│
     │                                │
-    │── file-upload (base64) ──────→ │ → fs.writeFile() → webviewUri
+    │── selection (offsets) ───────→ │ → EditorStatus → status bar (counts come from the TextDocument)
+    │── file-upload (base64) ──────→ │ → fs.writeFile() → relative path
     │← file-uploaded ──────────────│
-    │                                │
-    │── save / auto-save ──────────→ │ → reattach frontmatter → fs.writeFile()
-    │← saved ──────────────────────│
-    │                                │
-    │← load (content + baseUri) ───│   (frontmatter stripped)
 ```
 
 **Key patterns**:
 
-- **Frontmatter handling**: `extractFrontmatter()` strips YAML/TOML on load, `storedFrontmatter` is reattached on save/auto-save
-- **Image/file upload**: Files sent as base64 to host, saved to disk via `handleFileUpload()`, webview URI returned; `preprocessMarkdown`/`postprocessMarkdown` convert between relative paths and webview URIs (handles `%2B` encoding). Save directory resolved by `resolveAssetDir()` — defaults to document directory, configurable via `blogbuddy.assetDir` (relative paths only, must stay within document directory)
-- **Margin notes**: the block is the unit. A note covers whole top-level blocks (a block, a heading's section, or a selected range) and is tracked by the start positions of its first and last block. Everything a note shows is decorations — the document changes only when the writer accepts a change, as one ordinary undoable transaction
-- **Proposals**: the agent returns a rewrite of the note's blocks between `<bb-replace>` tags; `buildSequence()` turns it into block operations (keep / mod / add / del / move) and `locate()` finds where each still applies by block text, so the writer can keep editing around a pending proposal
+- **Document sync**: the editor's text is exactly the TextDocument's text (line breaks as `\n`; positions travel as line + character, so CRLF files stay CRLF). The webview pushes @codemirror/collab updates against the version it has seen; the host writes them with a WorkspaceEdit (VS Code refuses an edit to a document that moved on) and broadcasts every document change as numbered updates, recognizing its own write so the webview can confirm it. Incoming changes are narrowed to what differs. Never write files from the webview, and never bypass the TextDocument on the host. BB never saves on the writer's behalf — saving is `files.autoSave` or ⌘S. Switching between BB Editor and the text editor uses VS Code's in-place reopen (`reopenActiveEditorWith`), never close-one-open-other, which can drop unsaved changes
+- **Frontmatter**: part of the document, parsed as one `Frontmatter` node; shown as the properties panel (a block widget) and edited through it — fields, or the raw text in a small nested CodeMirror editor (YAML / TOML highlighting). What counts as frontmatter and the Lezer config live in `src/utils/frontmatter.ts`, shared with the host; the config reads the parser's non-public `input` for lookahead, and `src/test/utils/frontmatter.test.ts` fails if an upgrade takes it away. A transaction filter keeps ordinary typing and the caret out of it; unfiltered transactions (undo, remote updates, the panel's own edits) pass
+- **Theme**: CSS follows the classes VS Code puts on the webview body (`vscode-light`, `vscode-dark`, …); no theme messages
+- **Block widgets** (panel, note cards, proposed blocks, tables) must not carry vertical margins — CodeMirror measures border boxes, and a margin shifts every click below
+- **Image/file upload**: Files sent as base64 to host, saved via `handleFileUpload()`, inserted as Markdown with the path relative to the document; images resolve against the document folder only when displayed. Save directory resolved by `resolveAssetDir()` — defaults to document directory, configurable via `blogbuddy.assetDir` (relative paths only, must stay within document directory)
+- **Margin notes**: the block is the unit. A note covers whole top-level Markdown blocks (a block, a heading's section, or a selected range) and is tracked by the start positions of its first and last block. Everything a note shows is decorations — the document changes only when the writer accepts a change, as one ordinary undoable transaction
+- **Proposals**: the agent returns a rewrite of the note's blocks between `<bb-replace>` tags; `buildSequence()` turns it into block operations (keep / mod / add / del / move) and `locate()` finds where each still applies by block text (a block's text is its Markdown), so the writer can keep editing around a pending proposal
 - **UI placement**: information on the left (rail, change signs, summary line under the block), actions on the right (per-block accept / reject, and the note's own buttons at the right end of its rows)
 - **Signs, not words**: note UI uses glyphs (`※ ⌃ ∎ ± ✓ × ↻ ↺`, scope as Markdown's own markers, progress as `⌕ ↗ $ ✎ …`); words appear only in tooltips and in failure messages
-- **Milkdown presets**: Uses both `commonmark` and `gfm` presets — GFM adds tables, strikethrough, task lists, autolinks
+- **Markdown**: `@codemirror/lang-markdown` (Lezer, CommonMark + GFM) plus the `Frontmatter` extension; the same parser splits an agent's rewrite into blocks and renders Markdown to DOM (`md-render.ts`, no `innerHTML`)
 
 ## Development Principles
 
