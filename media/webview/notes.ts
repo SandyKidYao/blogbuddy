@@ -8,7 +8,7 @@ import {
 } from './notes-model';
 import { NotesView, type NotesSurface } from './notes-view';
 import { blockIndexAt, blocksOf, headingText, parseBlocks, type MdBlock } from './blocks';
-import { resolveUrl } from './live-preview';
+import { definitionsOf, resolveUrl } from './live-preview';
 import { renderMarkdown } from './md-render';
 
 /**
@@ -159,7 +159,7 @@ function rendered(state: EditorState, markdown: string, cls: string): HTMLElemen
     const box = document.createElement('div');
     box.className = `bb-preview bb-md ${cls}`;
     box.contentEditable = 'false';
-    box.append(renderMarkdown(markdown, url => resolveUrl(state, url)));
+    box.append(renderMarkdown(markdown, url => resolveUrl(state, url), definitionsOf(state)));
     return box;
 }
 
@@ -239,7 +239,8 @@ function buildNote(note: Note, order: number, state: EditorState, blocks: MdBloc
             const row = preview(`${id}:new`, () => {
                 const box = rendered(state, next, 'bb-d-new');
                 const before = document.createElement('div');
-                before.append(renderMarkdown(old.info.text));
+                // Read with the same definitions, so a footnote or reference is not a difference.
+                before.append(renderMarkdown(old.info.text, undefined, definitionsOf(state)));
                 highlightInsertions(box, before.textContent ?? '', box.textContent ?? '');
                 return box;
             });
@@ -582,7 +583,7 @@ const actions: NoteActions = {
     },
     renderMarkdown(markdown) {
         const state = view?.state;
-        const fragment = renderMarkdown(markdown, url => (state ? resolveUrl(state, url) : url));
+        const fragment = renderMarkdown(markdown, url => (state ? resolveUrl(state, url) : url), state && definitionsOf(state));
         return fragment;
     },
     scopeForBlock(pos) {

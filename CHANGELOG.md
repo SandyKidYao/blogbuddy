@@ -4,6 +4,21 @@ All notable changes to the "blogbuddy" extension will be documented in this file
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## [0.3.0] - 2026-11-16
+
+### Added
+
+- **Math.** `$…$` inline and `$$…$$` display math (a `$$` line opens a block) render as formulas while the caret is elsewhere; click one to edit its TeX. Prices stay prices: `$5 and $10` is not math, and `\$` escapes. Formulas are drawn as MathML by the editor itself, so nothing extra is downloaded.
+- **Footnotes.** `[^1]` shows as a small raised label with the note in its tooltip; `[^1]: …` definitions are a quieter line. A reference with no definition stays plain text, as on GitHub.
+- **The HTML a README uses.** `<p align="center">` (also `text-align: center` and `<center>`) centers its images, on one line or several; a row of linked badges stays a row; the words between such tags stay; a `<picture>` with dark and light `<source>`s follows VS Code's theme. Other HTML stays as faint source.
+- **Inline HTML tags** `<kbd>`, `<sub>`, `<sup>`, `<mark>`, `<u>`, `<small>`, `<b>`, `<i>`, `<s>`, `<code>` and `<a>` show as what they mean, their tags hidden like Markdown's marks; `<br>` breaks the line.
+- **Reference-style images** (`![logo][ref]`, `![logo][]`, `![logo]`) find their `[ref]: url` definition.
+
+### Fixed
+
+- An image wrapped in `<p align="center">` over several lines showed as code.
+- Tables, and the proposed blocks and answers of margin notes, now find links and footnotes defined elsewhere in the document; HTML in them shows as it does in the editor instead of being dropped.
+
 ## [0.2.0] - 2026-11-12
 
 ### Added

@@ -2,7 +2,7 @@
   "name": "blogbuddy",
   "displayName": "Blog Buddy",
   "description": "A WYSIWYG Markdown editor for VS Code with margin notes: leave a sentence beside a block, keep writing, and read your agent's answer when you are ready.",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "icon": "images/icon.png",
   "publisher": "FulcrumStudio",
   "repository": {
@@ -118,7 +118,7 @@
     "check-types": "tsc --noEmit && tsc --noEmit -p tsconfig.webview.json",
     "lint": "eslint src",
     "test": "vscode-test",
-    "test:unit": "npm run compile-tests && mocha --ui tdd out/test/utils/frontmatter.test.js out/test/utils/MarkdownStatsAnalyzer.test.js out/test/services/textSync.test.js out/test/services/agentProtocol.test.js out/test/core/blockDiff.test.js out/test/core/notes.test.js out/test/l10n.test.js",
+    "test:unit": "npm run compile-tests && mocha --ui tdd out/test/utils/frontmatter.test.js out/test/utils/markdownSyntax.test.js out/test/utils/markdownHtml.test.js out/test/utils/MarkdownStatsAnalyzer.test.js out/test/services/textSync.test.js out/test/services/agentProtocol.test.js out/test/core/blockDiff.test.js out/test/core/notes.test.js out/test/l10n.test.js",
     "deploy": "vsce publish"
   },
   "devDependencies": {
@@ -163,6 +163,7 @@
     "@lezer/highlight": "^1.2.5",
     "@lezer/markdown": "^1.8.1",
     "@vscode/l10n": "^0.0.18",
-    "js-yaml": "^4.1.1"
+    "js-yaml": "^4.1.1",
+    "katex": "^0.19.1"
   }
 }
