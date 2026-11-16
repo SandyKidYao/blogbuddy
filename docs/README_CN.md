@@ -84,6 +84,7 @@
 基于 [Milkdown](https://milkdown.dev) 的 `.md` 富文本编辑器。用 `Cmd+Shift+B` / `Ctrl+Shift+B` 打开：可以在资源管理器里选中 `.md` 文件，也可以在 VS Code 文本编辑器里打开着 `.md` 时直接原地切换。同一个快捷键切回 Markdown 源码。
 
 - **完整 GFM 的所见即所得**：表格、删除线、任务列表、自动链接、引用、代码块
+- **公式、脚注和 README 里的 HTML**：`$…$` / `$$…$$` 公式、`[^1]` 脚注、引用式图片、居中的图片和徽章行、跟随深浅主题的 `<picture>`，以及 `<kbd>`、`<sub>`、`<br>` 这类行内标签
 - **斜杠菜单（`/`）**：块类型
 - **Frontmatter 头部**：就是文件里的 `---` 围栏，`title`、`date`、`tags`、`categories`、`author`、`slug`、`draft`、`description` 原地编辑，一键切到原始 YAML
 - **源码行号**：每个块显示它在 `.md` 文件里的行号

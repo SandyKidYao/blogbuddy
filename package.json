@@ -2,7 +2,7 @@
   "name": "blogbuddy",
   "displayName": "Blog Buddy",
   "description": "A WYSIWYG Markdown editor for VS Code with margin notes: leave a sentence beside a block, keep writing, and read your agent's answer when you are ready.",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "icon": "images/icon.png",
   "publisher": "FulcrumStudio",
   "repository": {

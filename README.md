@@ -84,6 +84,7 @@ When you ask for changes ("tighten this", "fix typos", "reorganise this section"
 An editor for `.md` files, built on [CodeMirror 6](https://codemirror.net). What you edit is the file's own text: Markdown's marks are hidden and the text is styled, except on the line you are editing, where the marks come back (faintly) so you can change them directly. Open it with `Cmd+Shift+B` / `Ctrl+Shift+B` — on a `.md` file in the Explorer, or with a `.md` already open in VS Code's text editor to swap it for BB Editor in place. The same chord switches back to the Markdown source.
 
 - **Live preview with GFM** — headings, emphasis, links, lists, task lists (click a box to tick it), quotes, rules, images, fenced code; tables render as tables until you click into them
+- **Math, footnotes and README HTML** — `$…$` / `$$…$$` formulas, `[^1]` footnotes, reference-style images, centered images and badge rows, `<picture>` that follows the light / dark theme, and inline tags like `<kbd>`, `<sub>`, `<br>`
 - **The file is the document** — BB Editor edits VS Code's own document for the file. Nothing is rewritten on save; the unsaved dot, Save / Save As, Revert and hot exit work as in any editor; changes made on disk, by another extension, or in a text editor showing the same file appear as you type, and yours appear there
 - **Slash menu (`/`)** — block types, written as Markdown
 - **Frontmatter head** — the file's own `---` fences, with `title` · `date` · `tags` · `categories` · `author` · `slug` · `draft` · `description` edited in place; raw YAML one click away
