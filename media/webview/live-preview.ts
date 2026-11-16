@@ -1,16 +1,21 @@
 import { syntaxTree } from '@codemirror/language';
 import { type EditorState, type Extension, type Range, StateEffect, StateField } from '@codemirror/state';
 import { Decoration, type DecorationSet, EditorView, ViewPlugin, type ViewUpdate, WidgetType } from '@codemirror/view';
-import type { SyntaxNode } from '@lezer/common';
+import type { SyntaxNode, Tree } from '@lezer/common';
 import * as l10n from '@vscode/l10n';
-import { renderMarkdown, unbracket } from './md-render';
+import { imgAttrs, INLINE_TAGS, pairedTag, parseTag, readHtmlBlock } from '../../src/utils/markdownHtml';
+import {
+    type Definitions, documentDefinitions, mathSource, normalizeLabel, referenceLabel, unbracket,
+} from '../../src/utils/markdownSyntax';
+import { renderMarkdown, renderTeX, themedImage } from './md-render';
 
 /**
  * Live preview: the document is the Markdown source; this decides how it looks.
  * On lines the selection does not touch, syntax marks are hidden and the text
  * is styled (headings, emphasis, code, links, lists, tasks, quotes, rules,
- * images). On the caret's lines the marks come back, faint, so they can be
- * edited directly. Tables render as tables until the caret enters them.
+ * images, footnotes, inline HTML such as <kbd>, TeX math). On the caret's
+ * lines the marks come back, faint, so they can be edited directly. Tables
+ * and display math render as blocks until the caret enters them.
  * Nothing here changes the document, except ticking a task box.
  */
 
@@ -29,6 +34,27 @@ export function resolveUrl(state: EditorState, url: string): string {
     const base = state.field(baseUriField, false) ?? '';
     if (!base || !url || /^(?:[a-z][\w+.-]*:|\/\/|#)/i.test(url)) { return url; }
     return `${base}/${url.replace(/^\.\//, '')}`;
+}
+
+// ---- What the document defines (link URLs, footnotes), for references anywhere in it ----
+
+type DocDefinitions = Definitions & { key: string };
+const definitionsCache = new WeakMap<Tree, DocDefinitions>();
+
+/**
+ * The document's link and footnote definitions, read once per syntax tree. `key`
+ * changes only when they do, so a rendered table redraws when a definition it
+ * may use changes, not on every keystroke.
+ */
+export function definitionsOf(state: EditorState): DocDefinitions {
+    const tree = syntaxTree(state);
+    let defs = definitionsCache.get(tree);
+    if (!defs) {
+        const read = documentDefinitions(tree, (from, to) => state.sliceDoc(from, to));
+        defs = { ...read, key: JSON.stringify([[...read.links], [...read.notes]]) };
+        definitionsCache.set(tree, defs);
+    }
+    return defs;
 }
 
 // ---- Widgets ----
@@ -72,28 +98,56 @@ class Checkbox extends WidgetType {
 }
 
 class Image extends WidgetType {
-    constructor(readonly src: string, readonly alt: string) { super(); }
-    eq(other: Image): boolean { return other.src === this.src && other.alt === this.alt; }
+    /** `dark`: the version a <picture> shows in a dark theme, when it differs. */
+    constructor(readonly src: string, readonly alt: string, readonly dark = '') { super(); }
+    eq(other: Image): boolean { return other.src === this.src && other.alt === this.alt && other.dark === this.dark; }
     toDOM(): HTMLElement {
-        const img = document.createElement('img');
-        img.className = 'md-img';
-        img.src = this.src;
-        img.alt = this.alt;
-        img.title = this.alt;
-        img.addEventListener('error', () => img.classList.add('is-broken'));
-        return img;
+        const { node, images } = themedImage(this.src, this.alt, this.dark || undefined);
+        for (const img of images) {
+            img.classList.add('md-img');
+            img.title = this.alt;
+            img.addEventListener('error', () => img.classList.add('is-broken'));
+        }
+        return node;
     }
     get estimatedHeight(): number { return 200; }
 }
 
+/** <br> in a paragraph: the line goes on below. */
+class Break extends WidgetType {
+    eq(): boolean { return true; }
+    toDOM(): HTMLElement {
+        const el = document.createElement('span');
+        el.className = 'md-br';
+        return el;
+    }
+}
+
+/** TeX, drawn; clicking it puts the caret in its source. */
+class TeX extends WidgetType {
+    constructor(readonly tex: string, readonly display: boolean) { super(); }
+    eq(other: TeX): boolean { return other.tex === this.tex && other.display === this.display; }
+    toDOM(view: EditorView): HTMLElement {
+        const el = renderTeX(this.tex, this.display);
+        el.classList.add(this.display ? 'md-math-block' : 'md-math');
+        el.addEventListener('mousedown', event => {
+            event.preventDefault();
+            view.dispatch({ selection: { anchor: view.posAtDOM(el) + (this.display ? 2 : 1) } });
+            view.focus();
+        });
+        return el;
+    }
+    ignoreEvent(): boolean { return true; }
+}
+
 /** A rendered table standing in for its source; clicking it puts the caret inside. */
 class Table extends WidgetType {
-    constructor(readonly source: string, readonly base: string) { super(); }
-    eq(other: Table): boolean { return other.source === this.source && other.base === this.base; }
+    constructor(readonly source: string, readonly base: string, readonly defs: DocDefinitions) { super(); }
+    eq(other: Table): boolean { return other.source === this.source && other.base === this.base && other.defs.key === this.defs.key; }
     toDOM(view: EditorView): HTMLElement {
         const wrap = document.createElement('div');
         wrap.className = 'md-table';
-        wrap.append(renderMarkdown(this.source, url => resolveUrl(view.state, url)));
+        wrap.append(renderMarkdown(this.source, url => resolveUrl(view.state, url), this.defs));
         wrap.addEventListener('mousedown', event => {
             event.preventDefault();
             const pos = view.posAtDOM(wrap);
@@ -119,10 +173,6 @@ function activeLines(state: EditorState): Set<number> {
 const touches = (state: EditorState, from: number, to: number): boolean =>
     state.selection.ranges.some(range => range.from <= to && range.to >= from);
 
-const IMG_TAG = /^<img\b[^>]*>$/i;
-const IMG_SRC = /\bsrc\s*=\s*(["'])(.*?)\1/i;
-const IMG_ALT = /\balt\s*=\s*(["'])(.*?)\1/i;
-const STRUCTURAL = /^<\/?(?:div|p|span|center|section|figure|figcaption|picture|source|br|details|summary|sup|sub|kbd|a)\b[^>]*>$/i;
 
 const hide = Decoration.replace({});
 const markCls = (cls: string): Decoration => Decoration.mark({ class: cls });
@@ -153,12 +203,40 @@ function build(view: EditorView): DecorationSet {
         const end = withSpace && doc.sliceString(to, to + 1) === ' ' ? to + 1 : to;
         if (live(from)) { conceal(from, end); } else { add(from, to, markCls('md-mk')); }
     };
-    const image = (from: number, to: number, src: string, alt: string): void => {
-        const widget = new Image(resolveUrl(state, src), alt);
+    const image = (from: number, to: number, src: string, alt: string, dark?: string): void => {
+        const widget = new Image(resolveUrl(state, src), alt, dark && dark !== src ? resolveUrl(state, dark) : '');
         if (live(from) && oneLine(from, to)) { items.push(Decoration.replace({ widget }).range(from, to)); }
         else {
             add(from, to, markCls('md-mk'));
             items.push(Decoration.widget({ widget, side: 1 }).range(to));
+        }
+    };
+    const read = (from: number, to: number): string => doc.sliceString(from, to);
+    // Read from the whole tree only when something on screen refers to it.
+    const linkRef = (node: SyntaxNode): string | undefined => definitionsOf(state).links.get(referenceLabel(node, read));
+    const footnote = (label: string): string | undefined => definitionsOf(state).notes.get(normalizeLabel(label));
+
+    /**
+     * An HTML block, line by line (see readHtmlBlock): a line of presentational tags
+     * shows its images and words with the tags hidden, centered inside align="center";
+     * any other line stays faint source.
+     */
+    const htmlBlock = (from: number, to: number): void => {
+        for (const line of readHtmlBlock(read(from, to))) {
+            const start = from + line.from, end = from + line.to;
+            if (!line.shown) { add(start, end, markCls('md-html')); continue; }
+            for (const part of line.parts) {
+                const a = from + part.from, b = from + part.to;
+                if (part.kind === 'img') { image(a, b, part.src, part.alt, part.dark); }
+                else if (part.kind === 'tag') { add(a, b, live(a) ? hide : markCls('md-mk')); }
+            }
+            if (!live(start)) { continue; }
+            if (!line.content) { items.push(lineCls('md-gap').range(doc.lineAt(start).from)); continue; }
+            // The indent would push a centered image off center.
+            const text = read(start, end);
+            add(start, start + text.length - text.trimStart().length, hide);
+            const cls = [line.images ? 'md-html-img' : '', line.centered ? 'md-center' : ''].filter(Boolean).join(' ');
+            if (cls) { items.push(lineCls(cls).range(doc.lineAt(start).from)); }
         }
     };
 
@@ -228,8 +306,43 @@ function build(view: EditorView): DecorationSet {
                         const marks = n.node.getChildren('LinkMark');
                         const url = n.node.getChild('URL');
                         const alt = marks.length >= 2 ? doc.sliceString(marks[0].to, marks[1].from) : '';
-                        image(n.from, n.to, url ? unbracket(doc.sliceString(url.from, url.to)) : '', alt);
+                        // ![alt][label] looks its URL up; with no definition it is just text.
+                        const src = url ? unbracket(doc.sliceString(url.from, url.to)) : linkRef(n.node);
+                        if (src) { image(n.from, n.to, src, alt); }
                         return false;
+                    }
+                    case 'InlineMath': {
+                        const { tex, display } = mathSource(n.node, read);
+                        if (tex && live(n.from) && oneLine(n.from, n.to)) {
+                            add(n.from, n.to, Decoration.replace({ widget: new TeX(tex, display) }));
+                        } else {
+                            add(n.from, n.to, markCls('md-math-src'));
+                            for (const mark of n.node.getChildren('InlineMathMark')) { add(mark.from, mark.to, markCls('md-mk')); }
+                        }
+                        return false;
+                    }
+                    case 'BlockMath': {
+                        // Drawn by the block field while the caret is elsewhere; here it is being edited.
+                        const { tex } = mathSource(n.node, read);
+                        if (n.node.parent?.name !== 'Document' && tex && live(n.from) && oneLine(n.from, n.to)) {
+                            add(n.from, n.to, Decoration.replace({ widget: new TeX(tex, true) }));   // $$…$$ in a list or quote
+                            return false;
+                        }
+                        lines(n.from, n.to, 'md-math-src');
+                        for (const mark of n.node.getChildren('BlockMathMark')) { add(mark.from, mark.to, markCls('md-mk')); }
+                        return false;
+                    }
+                    case 'FootnoteReference': case 'FootnoteDefinition': {
+                        const label = n.node.getChild('FootnoteLabel');
+                        const marks = n.node.getChildren('FootnoteMark');
+                        const definition = name === 'FootnoteDefinition';
+                        // Like GitHub: without a definition, [^x] is just text.
+                        const note = !definition && label ? footnote(read(label.from, label.to)) : undefined;
+                        if (!label || (!definition && note === undefined)) { return false; }
+                        if (definition) { lines(n.from, n.to, 'md-fn'); }
+                        add(label.from, label.to, Decoration.mark({ class: 'md-fnref', attributes: note ? { title: note } : undefined }));
+                        marks.forEach((mark, i) => marker(mark.from, mark.to, definition && i === 1));
+                        return definition ? undefined : false;
                     }
                     case 'Blockquote': lines(n.from, n.to, 'md-quote'); return;
                     case 'QuoteMark': marker(n.from, n.to, true); return;
@@ -261,18 +374,26 @@ function build(view: EditorView): DecorationSet {
                         if (live(n.from)) { add(n.from, n.to, hide); items.push(lineCls('md-hr').range(doc.lineAt(n.from).from)); }
                         else { add(n.from, n.to, markCls('md-mk')); }
                         return;
-                    case 'HTMLTag': case 'HTMLBlock': {
-                        const source = doc.sliceString(n.from, n.to).trim();
-                        if (IMG_TAG.test(source)) {
-                            image(n.from, n.to, IMG_SRC.exec(source)?.[2] ?? '', IMG_ALT.exec(source)?.[2] ?? '');
-                        } else if (STRUCTURAL.test(source) && live(n.from) && name === 'HTMLBlock' && oneLine(n.from, n.to)) {
-                            add(n.from, n.to, hide);
-                            items.push(lineCls('md-gap').range(doc.lineAt(n.from).from));
+                    case 'HTMLTag': {
+                        const tag = parseTag(read(n.from, n.to));
+                        const pair = pairedTag(n.node, read);
+                        if (tag?.name === 'img') {
+                            const { src, alt } = imgAttrs(tag.source);
+                            image(n.from, n.to, src, alt);
+                        } else if (tag?.name === 'br') {
+                            if (live(n.from)) { add(n.from, n.to, Decoration.replace({ widget: new Break() })); }
+                            else { add(n.from, n.to, markCls('md-mk')); }
+                        } else if (tag && pair) {
+                            // <kbd>…</kbd> and the like: the tags step back like Markdown's marks.
+                            const cls = INLINE_TAGS.get(tag.name)?.[1];
+                            if (!tag.close && cls) { add(n.to, pair.from, markCls(cls)); }
+                            marker(n.from, n.to);
                         } else {
                             add(n.from, n.to, markCls('md-html'));
                         }
                         return false;
                     }
+                    case 'HTMLBlock': htmlBlock(n.from, n.to); return false;
                     case 'Comment': case 'CommentBlock': add(n.from, n.to, markCls('md-html')); return false;
                     case 'Table':
                         // Rendered by the table field while the caret is elsewhere; here it is being edited.
@@ -307,17 +428,20 @@ const livePlugin = ViewPlugin.fromClass(class {
     }
 }, { decorations: plugin => plugin.decorations });
 
-// ---- Tables: block widgets, so they come from a state field ----
+// ---- Tables and display math: block widgets, so they come from a state field ----
 
-function buildTables(state: EditorState): DecorationSet {
+function buildBlocks(state: EditorState): DecorationSet {
     const items: Range<Decoration>[] = [];
     const base = state.field(baseUriField, false) ?? '';
     syntaxTree(state).iterate({
         enter: (n) => {
-            if (n.name !== 'Table') { return n.name === 'Document' ? undefined : false; }
+            if (n.name !== 'Table' && n.name !== 'BlockMath') { return n.name === 'Document' ? undefined : false; }
             const from = state.doc.lineAt(n.from).from, to = state.doc.lineAt(n.to).to;
-            if (!touches(state, from, to)) {
-                items.push(Decoration.replace({ widget: new Table(state.sliceDoc(from, to), base), block: true }).range(from, to));
+            const tex = n.name === 'BlockMath' ? mathSource(n.node, (a, b) => state.sliceDoc(a, b)).tex : '';
+            // An empty $$ … $$ stays source: drawn, it would be a block of no height to click.
+            if (!touches(state, from, to) && (n.name === 'Table' || tex)) {
+                const widget = n.name === 'Table' ? new Table(state.sliceDoc(from, to), base, definitionsOf(state)) : new TeX(tex, true);
+                items.push(Decoration.replace({ widget, block: true }).range(from, to));
             }
             return false;
         },
@@ -325,12 +449,12 @@ function buildTables(state: EditorState): DecorationSet {
     return Decoration.set(items, true);
 }
 
-const tableField = StateField.define<DecorationSet>({
-    create: buildTables,
+const blockField = StateField.define<DecorationSet>({
+    create: buildBlocks,
     update(value, tr) {
         if (tr.docChanged || tr.selection || syntaxTree(tr.startState) !== syntaxTree(tr.state)
             || tr.effects.some(effect => effect.is(setBaseUri))) {
-            return buildTables(tr.state);
+            return buildBlocks(tr.state);
         }
         return value;
     },
@@ -338,5 +462,5 @@ const tableField = StateField.define<DecorationSet>({
 });
 
 export function livePreview(): Extension {
-    return [baseUriField, livePlugin, tableField];
+    return [baseUriField, livePlugin, blockField];
 }

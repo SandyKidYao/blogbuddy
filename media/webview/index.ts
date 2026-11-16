@@ -10,7 +10,7 @@ import { classHighlighter } from '@lezer/highlight';
 import type { HostMessage, WebviewMessage } from '../../src/services/webviewProtocol';
 import { codeLanguages } from './code-languages';
 import { arrowLigatures, tab, toggleBold, toggleWrap } from './commands';
-import { frontmatterSyntax } from '../../src/utils/frontmatter';
+import { bbMarkdownSyntax } from '../../src/utils/markdownSyntax';
 import { frontmatter, frontmatterText, fromPanel, writeFrontmatter } from './frontmatter';
 import { frontmatterPanel, getFrontmatter, onFrontmatterChange, updateFrontmatterPanel } from './frontmatter-panel';
 import { sourceLineNumbers } from './line-numbers';
@@ -73,7 +73,7 @@ function createState(doc: string, version: number, editable: boolean): EditorSta
     return EditorState.create({
         doc,
         extensions: [
-            markdown({ base: markdownLanguage, codeLanguages, extensions: [frontmatterSyntax], addKeymap: true }),
+            markdown({ base: markdownLanguage, codeLanguages, extensions: bbMarkdownSyntax, addKeymap: true }),
             syntaxHighlighting(classHighlighter),
             frontmatter(),
             livePreview(),

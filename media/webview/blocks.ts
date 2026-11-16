@@ -4,7 +4,7 @@ import type { EditorState } from '@codemirror/state';
 import type { Tree } from '@lezer/common';
 import type { MarkdownParser } from '@lezer/markdown';
 import type { BlockInfo } from '../../src/core/blockDiff';
-import { frontmatterSyntax } from '../../src/utils/frontmatter';
+import { bbMarkdownSyntax } from '../../src/utils/markdownSyntax';
 
 /**
  * Top-level Markdown blocks: the children of the syntax tree's Document node.
@@ -69,7 +69,7 @@ export function blocksOf(state: EditorState): MdBlock[] {
 }
 
 /** The editor's Markdown parser, for text outside the editor. */
-const parser = (markdownLanguage.parser as MarkdownParser).configure([frontmatterSyntax]);
+const parser = (markdownLanguage.parser as MarkdownParser).configure(bbMarkdownSyntax);
 
 /** The blocks of a Markdown string outside any editor (an agent's rewrite, an intermediate document). */
 export function parseBlocks(markdown: string): MdBlock[] {

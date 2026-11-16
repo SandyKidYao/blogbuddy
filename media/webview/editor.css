@@ -50,7 +50,40 @@
     font-size: 0.9em;
 }
 #editor .md-link { color: var(--vscode-textLink-foreground, #4fc1ff); }
-#editor .md-html { font: 0.85em var(--vscode-editor-font-family, ui-monospace, monospace); color: var(--vscode-descriptionForeground, #888); opacity: 0.75; }
+#editor .md-html, .bb-html { font: 0.85em var(--vscode-editor-font-family, ui-monospace, monospace); color: var(--vscode-descriptionForeground, #888); opacity: 0.75; }
+.bb-html { white-space: pre-wrap; }
+
+/* Inline HTML shown as what it means (<kbd>, <sub>, <mark>, …) */
+#editor .md-kbd, .bb-md kbd, .bb-note-a kbd, .md-table kbd {
+    font: 0.85em var(--vscode-editor-font-family, ui-monospace, monospace);
+    padding: 1px 5px;
+    border: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.45));
+    border-bottom-width: 2px;
+    border-radius: 4px;
+}
+#editor .md-sub { vertical-align: sub; font-size: 0.78em; }
+#editor .md-sup { vertical-align: super; font-size: 0.78em; }
+#editor .md-mark { background: var(--vscode-editor-findMatchHighlightBackground, rgba(234, 179, 8, 0.35)); border-radius: 2px; }
+#editor .md-u { text-decoration: underline; text-underline-offset: 2px; }
+#editor .md-small { font-size: 0.85em; }
+#editor .md-br { display: block; }
+
+/* Footnotes: the reference a small raised label (its note in the tooltip); the definition a quieter line. */
+#editor .md-fnref, .bb-fnref { vertical-align: super; font-size: 0.75em; line-height: 0; color: var(--vscode-textLink-foreground, #4fc1ff); }
+#editor .cm-line.md-fn, .bb-fn { font-size: 0.9em; color: var(--vscode-descriptionForeground, #888); }
+#editor .cm-line.md-fn .md-fnref { margin-right: 0.4em; }
+
+/* Math: MathML drawn by the webview; the source while the caret is in it. */
+#editor .md-math-src { font-family: var(--vscode-editor-font-family, ui-monospace, monospace); font-size: 0.9em; }
+#editor .md-math { cursor: text; }
+#editor .md-math-block { padding: 6px 0; text-align: center; overflow-x: auto; cursor: text; }
+.bb-math math { font-size: 1.1em; }
+.bb-math-display { overflow-x: auto; }
+.bb-math.is-error { color: var(--vscode-errorForeground, #f48771); font-family: var(--vscode-editor-font-family, ui-monospace, monospace); }
+
+/* <picture> with dark / light sources follows VS Code's theme. */
+body.vscode-light .bb-dark-only, body.vscode-high-contrast-light .bb-dark-only,
+body:not(.vscode-light):not(.vscode-high-contrast-light) .bb-light-only { display: none !important; }
 
 /* Blank lines between blocks shrink to paragraph spacing; so does a hidden setext underline. */
 #editor .cm-line.md-gap, #editor .cm-line.md-setext-rule { line-height: 0.9em; }
@@ -86,6 +119,9 @@
 #editor .cm-line.md-table-src { font-family: var(--vscode-editor-font-family, ui-monospace, monospace); font-size: 13px; }
 
 #editor .md-img { display: block; max-width: 100%; margin: 4px 0; border-radius: 4px; }
+/* Images from HTML sit inline, so a row of badges stays a row and align="center" can center them. */
+#editor .cm-line.md-html-img .md-img { display: inline-block; vertical-align: middle; margin: 4px 2px; }
+#editor .cm-line.md-center { text-align: center; }
 #editor .md-img.is-broken { min-height: 24px; min-width: 80px; outline: 1px dashed var(--vscode-panel-border, #444); }
 
 /* Code colours (classHighlighter tokens): code blocks and the raw frontmatter. Dark themes by the class VS Code puts on the webview body. */
